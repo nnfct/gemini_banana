@@ -9,6 +9,7 @@ import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import { generateVirtualTryOnImage } from './api/generate.js';
+import { recommendSimilarItems, recommendFromVirtualTryOn } from './api/recommend.js';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -39,6 +40,58 @@ app.post('/api/generate', async (req, res) => {
       return res.json({ generatedImage: generated });
     }
     return res.status(500).json({ error: 'Could not generate image.' });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: err instanceof Error ? err.message : 'Server error' });
+  }
+});
+
+app.post('/api/recommend', async (req, res) => {
+  try {
+    const { person, clothingItems } = req.body || {};
+    if (!person && !clothingItems) {
+      return res.status(400).json({ error: 'Person image or clothing items are required in request body.' });
+    }
+
+    // Check if Azure OpenAI is configured
+    if (!process.env.AZURE_OPENAI_ENDPOINT || !process.env.AZURE_OPENAI_KEY || !process.env.AZURE_OPENAI_DEPLOYMENT_ID) {
+      // Return mock recommendations from catalog for local dev when Azure OpenAI is not configured
+      const catalog = [
+        { "id": "p001", "title": "블랙 오버사이즈 후드티", "price": 42000, "score": 3 },
+        { "id": "p002", "title": "라이트 블루 스트레이트 진", "price": 59000, "score": 2 }
+      ];
+      return res.json({ recommendations: catalog });
+    }
+
+    const result = await recommendSimilarItems(person, clothingItems || {});
+    return res.json(result);
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: err instanceof Error ? err.message : 'Server error' });
+  }
+});
+
+// 가상 피팅 결과 이미지 기반 추천 엔드포인트
+app.post('/api/recommend-from-fitting', async (req, res) => {
+  try {
+    const { generatedImage, mimeType, originalClothingItems } = req.body || {};
+    
+    if (!generatedImage) {
+      return res.status(400).json({ error: 'Generated image is required in request body.' });
+    }
+
+    // base64 데이터에서 prefix 제거 (data:image/jpeg;base64, 부분)
+    const base64Data = generatedImage.replace(/^data:image\/[a-z]+;base64,/, '');
+    
+    const result = await recommendFromVirtualTryOn(
+      base64Data, 
+      mimeType || 'image/jpeg', 
+      originalClothingItems || {}
+    );
+    
+    return res.json(result);
 
   } catch (err) {
     console.error(err);
