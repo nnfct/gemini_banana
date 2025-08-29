@@ -6,6 +6,14 @@ interface ClothingItems {
   shoes?: UploadedImage | null;
 }
 
+interface RecommendationItem {
+  id: string;
+  title: string;
+  price: number;
+  imageUrl?: string;
+  score?: number;
+}
+
 /**
  * Sends image data to the backend API to generate a virtual try-on image.
  * @param person - The uploaded image of the person.
@@ -57,5 +65,103 @@ export const combineImages = async (person: UploadedImage, clothingItems: Clothi
   } catch (error) {
     console.error("Error calling backend API:", error);
     throw new Error(`Failed to generate image. ${error instanceof Error ? error.message : 'Please check the console for details.'}`);
+  }
+};
+
+/**
+ * Sends image data to the backend API to get similar product recommendations.
+ * @param person - The uploaded image of the person.
+ * @param clothingItems - An object containing uploaded images for top, pants, and shoes.
+ * @returns A list of recommended products.
+ */
+export const getRecommendations = async (person?: UploadedImage, clothingItems?: ClothingItems): Promise<RecommendationItem[]> => {
+  const payload = {
+    person: person ? {
+      base64: person.base64,
+      mimeType: person.mimeType,
+    } : null,
+    clothingItems: {
+      top: clothingItems?.top ? { base64: clothingItems.top.base64, mimeType: clothingItems.top.mimeType } : null,
+      pants: clothingItems?.pants ? { base64: clothingItems.pants.base64, mimeType: clothingItems.pants.mimeType } : null,
+      shoes: clothingItems?.shoes ? { base64: clothingItems.shoes.base64, mimeType: clothingItems.shoes.mimeType } : null,
+    }
+  };
+
+  try {
+    const response = await fetch('/api/recommend', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: 'An unknown server error occurred.' }));
+      throw new Error(errorData.message || `Server responded with status: ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (result.error) {
+      throw new Error(result.error);
+    }
+    
+    return result.recommendations || [];
+
+  } catch (error) {
+    console.error("Error calling recommendation API:", error);
+    throw new Error(`Failed to get recommendations. ${error instanceof Error ? error.message : 'Please check the console for details.'}`);
+  }
+};
+
+/**
+ * 가상 피팅 완료 후 생성된 이미지를 기반으로 유사한 상품을 추천받습니다.
+ * @param generatedImage - 가상 피팅으로 생성된 이미지 (base64 data URI)
+ * @param originalClothingItems - 원본 의류 아이템들 (참고용)
+ * @returns 카테고리별 추천 상품 목록
+ */
+export const getRecommendationsFromFitting = async (
+  generatedImage: string, 
+  originalClothingItems?: ClothingItems
+): Promise<{
+  recommendations: {
+    top: RecommendationItem[];
+    pants: RecommendationItem[];
+    shoes: RecommendationItem[];
+    accessories: RecommendationItem[];
+  }
+}> => {
+  const payload = {
+    generatedImage,
+    mimeType: 'image/jpeg',
+    originalClothingItems: originalClothingItems || {}
+  };
+
+  try {
+    const response = await fetch('/api/recommend-from-fitting', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: 'An unknown server error occurred.' }));
+      throw new Error(errorData.message || `Server responded with status: ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (result.error) {
+      throw new Error(result.error);
+    }
+    
+    return result;
+
+  } catch (error) {
+    console.error("Error calling fitting recommendation API:", error);
+    throw new Error(`Failed to get fitting recommendations. ${error instanceof Error ? error.message : 'Please check the console for details.'}`);
   }
 };
