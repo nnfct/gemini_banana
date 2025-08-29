@@ -1,10 +1,24 @@
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import OpenAI from 'openai';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const catalog = JSON.parse(readFileSync(join(__dirname, '../data/catalog.json'), 'utf8'));
+
+// Azure OpenAI 클라이언트 설정
+let openaiClient = null;
+if (process.env.AZURE_OPENAI_ENDPOINT && process.env.AZURE_OPENAI_KEY) {
+    openaiClient = new OpenAI({
+        apiKey: process.env.AZURE_OPENAI_KEY,
+        baseURL: `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${process.env.AZURE_OPENAI_DEPLOYMENT_ID}`,
+        defaultQuery: { 'api-version': '2024-02-15-preview' },
+        defaultHeaders: {
+            'api-key': process.env.AZURE_OPENAI_KEY,
+        },
+    });
+}
 
 /**
  * 가상 피팅 완료 후 합성된 이미지를 분석하여 유사한 상품을 추천합니다.
@@ -15,39 +29,83 @@ const catalog = JSON.parse(readFileSync(join(__dirname, '../data/catalog.json'),
  */
 export const recommendFromVirtualTryOn = async (generatedImageBase64, mimeType = 'image/jpeg', originalClothingItems = {}) => {
     // Azure OpenAI가 설정되어 있지 않은 경우 mock 추천 반환
-    if (!process.env.AZURE_OPENAI_ENDPOINT || !process.env.AZURE_OPENAI_KEY) {
+    if (!openaiClient) {
+        console.log('Azure OpenAI not configured, using mock recommendations');
         return getMockRecommendations(originalClothingItems);
     }
 
     try {
-        // 실제 구현에서는 Azure OpenAI Vision API를 사용하여 이미지 분석
-        // 현재는 mock 데이터로 구현
-        const analysisPrompt = `
-        다음 이미지는 사람이 옷을 입은 가상 피팅 결과입니다. 
-        이미지를 분석하여 착용하고 있는 의류의 특징을 파악하고, 
-        유사한 스타일의 상품을 추천하기 위한 키워드를 추출해주세요.
+        console.log('Analyzing virtual try-on image with Azure OpenAI Vision...');
         
-        다음 항목들을 JSON 형태로 반환해주세요:
-        {
-            "top": ["색상", "스타일", "패턴", "핏"],
-            "pants": ["색상", "스타일", "핏", "길이"],
-            "shoes": ["색상", "스타일", "타입"],
-            "overall_style": ["캐주얼/포멀", "시즌", "연령대"]
+        // Azure OpenAI Vision API를 사용하여 실제 이미지 분석
+        const analysisPrompt = `
+이 이미지는 사람이 옷을 입은 가상 피팅 결과입니다. 
+이미지를 자세히 분석하여 착용하고 있는 의류의 특징을 파악해주세요.
+
+다음 JSON 형태로만 응답해주세요 (다른 텍스트 없이):
+{
+    "top": ["색상", "스타일", "패턴", "핏"],
+    "pants": ["색상", "스타일", "핏", "길이"],
+    "shoes": ["색상", "스타일", "타입"],
+    "overall_style": ["캐주얼/포멀", "시즌감", "연령대"]
+}
+
+예시:
+{
+    "top": ["black", "hoodie", "oversized", "casual"],
+    "pants": ["blue", "jeans", "straight", "regular"],
+    "shoes": ["white", "sneakers", "casual"],
+    "overall_style": ["casual", "street", "young"]
+}
+`;
+
+        const response = await openaiClient.chat.completions.create({
+            model: process.env.AZURE_OPENAI_DEPLOYMENT_ID || 'gpt-4-vision-preview',
+            messages: [
+                {
+                    role: 'user',
+                    content: [
+                        {
+                            type: 'text',
+                            text: analysisPrompt
+                        },
+                        {
+                            type: 'image_url',
+                            image_url: {
+                                url: `data:${mimeType};base64,${generatedImageBase64}`,
+                                detail: 'high'
+                            }
+                        }
+                    ]
+                }
+            ],
+            max_tokens: 500,
+            temperature: 0.1
+        });
+
+        const analysisText = response.choices[0]?.message?.content;
+        console.log('Azure OpenAI Analysis:', analysisText);
+
+        // JSON 파싱 시도
+        let analysis;
+        try {
+            // JSON 부분만 추출 (```json이나 다른 마크다운 제거)
+            const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
+            const jsonString = jsonMatch ? jsonMatch[0] : analysisText;
+            analysis = JSON.parse(jsonString);
+        } catch (parseError) {
+            console.error('Failed to parse Azure OpenAI response as JSON:', parseError);
+            console.log('Raw response:', analysisText);
+            // 파싱 실패 시 mock 사용
+            return getMockRecommendations(originalClothingItems);
         }
-        `;
 
-        // Mock 분석 결과 (실제로는 OpenAI Vision API 호출)
-        const mockAnalysis = {
-            top: ["black", "hoodie", "oversized", "casual"],
-            pants: ["blue", "jeans", "straight", "regular"],
-            shoes: ["white", "sneakers", "casual"],
-            overall_style: ["casual", "street", "young"]
-        };
-
-        return findSimilarProducts(mockAnalysis);
+        console.log('Parsed analysis:', analysis);
+        return findSimilarProducts(analysis);
 
     } catch (error) {
-        console.error('Error analyzing virtual try-on image:', error);
+        console.error('Error analyzing virtual try-on image with Azure OpenAI:', error);
+        // 오류 발생 시 mock 추천 반환
         return getMockRecommendations(originalClothingItems);
     }
 };
