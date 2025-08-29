@@ -82,6 +82,9 @@ app.post('/api/recommend-from-fitting', async (req, res) => {
       return res.status(400).json({ error: 'Generated image is required in request body.' });
     }
 
+    console.log('Received recommendation request for virtual fitting image');
+    console.log('Azure OpenAI configured:', !!process.env.AZURE_OPENAI_ENDPOINT && !!process.env.AZURE_OPENAI_KEY);
+
     // base64 데이터에서 prefix 제거 (data:image/jpeg;base64, 부분)
     const base64Data = generatedImage.replace(/^data:image\/[a-z]+;base64,/, '');
     
@@ -91,10 +94,11 @@ app.post('/api/recommend-from-fitting', async (req, res) => {
       originalClothingItems || {}
     );
     
+    console.log('Recommendation result:', result);
     return res.json(result);
 
   } catch (err) {
-    console.error(err);
+    console.error('Error in recommend-from-fitting endpoint:', err);
     return res.status(500).json({ error: err instanceof Error ? err.message : 'Server error' });
   }
 });
