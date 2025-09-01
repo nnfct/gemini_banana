@@ -29,10 +29,17 @@ const config = {
             maxTokens: parseInt(process.env.GEMINI_MAX_TOKENS) || 1000
         },
         azure: {
-            endpoint: process.env.AZURE_OPENAI_ENDPOINT,
-            apiKey: process.env.AZURE_OPENAI_KEY,
-            deploymentId: process.env.AZURE_OPENAI_DEPLOYMENT_ID,
-            apiVersion: process.env.AZURE_OPENAI_API_VERSION || '2024-02-15-preview'
+            openai: {
+                endpoint: process.env.AZURE_OPENAI_ENDPOINT,
+                apiKey: process.env.AZURE_OPENAI_KEY,
+                deploymentId: process.env.AZURE_OPENAI_DEPLOYMENT_ID,
+                apiVersion: process.env.AZURE_OPENAI_API_VERSION || '2024-02-15-preview'
+            },
+            computerVision: {
+                endpoint: process.env.AZURE_COMPUTER_VISION_ENDPOINT,
+                apiKey: process.env.AZURE_COMPUTER_VISION_KEY,
+                apiVersion: process.env.AZURE_COMPUTER_VISION_API_VERSION || '2023-10-01'
+            }
         }
     },
 
