@@ -26,13 +26,13 @@ export const combineImages = async (person: UploadedImage, clothingItems: Clothi
   // A template for this backend logic can be found in `api/generate.ts`.
   const payload = {
     person: {
-        base64: person.base64,
-        mimeType: person.mimeType,
+      base64: person.base64,
+      mimeType: person.mimeType,
     },
     clothingItems: {
-        top: clothingItems.top ? { base64: clothingItems.top.base64, mimeType: clothingItems.top.mimeType } : null,
-        pants: clothingItems.pants ? { base64: clothingItems.pants.base64, mimeType: clothingItems.pants.mimeType } : null,
-        shoes: clothingItems.shoes ? { base64: clothingItems.shoes.base64, mimeType: clothingItems.shoes.mimeType } : null,
+      top: clothingItems.top ? { base64: clothingItems.top.base64, mimeType: clothingItems.top.mimeType } : null,
+      pants: clothingItems.pants ? { base64: clothingItems.pants.base64, mimeType: clothingItems.pants.mimeType } : null,
+      shoes: clothingItems.shoes ? { base64: clothingItems.shoes.base64, mimeType: clothingItems.shoes.mimeType } : null,
     }
   };
 
@@ -50,16 +50,16 @@ export const combineImages = async (person: UploadedImage, clothingItems: Clothi
     });
 
     if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'An unknown server error occurred.' }));
-        throw new Error(errorData.message || `Server responded with status: ${response.status}`);
+      const errorData = await response.json().catch(() => ({ message: 'An unknown server error occurred.' }));
+      throw new Error(errorData.message || `Server responded with status: ${response.status}`);
     }
 
     const result = await response.json();
 
     if (result.error) {
-        throw new Error(result.error);
+      throw new Error(result.error);
     }
-    
+
     return result.generatedImage || null;
 
   } catch (error) {
@@ -106,7 +106,7 @@ export const getRecommendations = async (person?: UploadedImage, clothingItems?:
     if (result.error) {
       throw new Error(result.error);
     }
-    
+
     return result.recommendations || [];
 
   } catch (error) {
@@ -122,7 +122,7 @@ export const getRecommendations = async (person?: UploadedImage, clothingItems?:
  * @returns 카테고리별 추천 상품 목록
  */
 export const getRecommendationsFromFitting = async (
-  generatedImage: string, 
+  generatedImage: string,
   originalClothingItems?: ClothingItems
 ): Promise<{
   recommendations: {
@@ -157,11 +157,72 @@ export const getRecommendationsFromFitting = async (
     if (result.error) {
       throw new Error(result.error);
     }
-    
+
     return result;
 
   } catch (error) {
     console.error("Error calling fitting recommendation API:", error);
     throw new Error(`Failed to get fitting recommendations. ${error instanceof Error ? error.message : 'Please check the console for details.'}`);
+  }
+};
+
+/**
+ * 업로드된 이미지를 기반으로 시각적 유사성 추천을 받습니다.
+ * @param image - 업로드된 이미지 (base64 data URI)
+ * @param options - 추천 옵션
+ * @returns 카테고리별 추천 상품 목록
+ */
+export const getVisualRecommendations = async (
+  image: string,
+  options: {
+    provider?: 'azure' | 'local' | 'auto';
+    categories?: string[];
+    maxResults?: number;
+    minSimilarity?: number;
+    priceRange?: [number, number];
+    brands?: string[];
+  } = {}
+): Promise<{
+  success: boolean;
+  processingTime: number;
+  provider: string;
+  recommendations: {
+    top: RecommendationItem[];
+    pants: RecommendationItem[];
+    shoes: RecommendationItem[];
+    accessories: RecommendationItem[];
+  };
+  metadata?: any;
+}> => {
+  const payload = {
+    image,
+    options
+  };
+
+  try {
+    const response = await fetch('/api/recommend-visual', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: 'An unknown server error occurred.' }));
+      throw new Error(errorData.message || `Server responded with status: ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.error?.message || 'Visual recommendation failed');
+    }
+
+    return result;
+
+  } catch (error) {
+    console.error("Error calling visual recommendation API:", error);
+    throw new Error(`Failed to get visual recommendations. ${error instanceof Error ? error.message : 'Please check the console for details.'}`);
   }
 };
