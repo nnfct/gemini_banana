@@ -1,0 +1,46 @@
+{
+    "name": "ai-virtual-try-on-backend",
+    "version": "1.0.0",
+    "description": "Backend API server for AI Virtual Try-On application",
+    "type": "module",
+    "main": "src/server.js",
+    "scripts": {
+        "start": "cross-env NODE_ENV=production node src/server.js",
+        "dev": "cross-env NODE_ENV=development nodemon --config nodemon.json",
+        "dev:debug": "cross-env NODE_ENV=development node --inspect src/server.js",
+        "build": "npm run build:clean && npm run build:copy",
+        "build:clean": "node -e \"const fs = require('fs'); if (fs.existsSync('dist')) fs.rmSync('dist', {recursive: true}); fs.mkdirSync('dist', {recursive: true});\"",
+        "build:copy": "node scripts/build.js",
+        "build:prod": "cross-env NODE_ENV=production npm run build",
+        "test": "cross-env NODE_ENV=test jest",
+        "test:watch": "cross-env NODE_ENV=test jest --watch",
+        "test:coverage": "cross-env NODE_ENV=test jest --coverage",
+        "lint": "eslint src/",
+        "lint:fix": "eslint src/ --fix",
+        "health": "node -e \"const http = require('http'); http.get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1));\""
+    },
+    "dependencies": {
+        "@google/genai": "^1.16.0",
+        "body-parser": "^2.2.0",
+        "cors": "^2.8.5",
+        "dotenv": "^17.2.1",
+        "express": "^5.1.0",
+        "openai": "^5.16.0"
+    },
+    "devDependencies": {
+        "@types/node": "^22.14.0",
+        "cross-env": "^7.0.3",
+        "eslint": "^8.57.0",
+        "jest": "^29.7.0",
+        "nodemon": "^3.0.2",
+        "supertest": "^6.3.3"
+    },
+    "keywords": [
+        "ai",
+        "virtual-try-on",
+        "express",
+        "api"
+    ],
+    "author": "",
+    "license": "ISC"
+}
