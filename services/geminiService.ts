@@ -37,6 +37,17 @@ export const combineImages = async (person: UploadedImage, clothingItems: Clothi
   };
 
   try {
+    // Debug logging
+    console.log('🚀 Sending request to /api/generate');
+    console.log('📦 Payload structure:', {
+      person: payload.person ? 'present' : 'missing',
+      clothingItems: {
+        top: payload.clothingItems.top ? 'present' : 'missing',
+        pants: payload.clothingItems.pants ? 'present' : 'missing',
+        shoes: payload.clothingItems.shoes ? 'present' : 'missing',
+      }
+    });
+
     // This fetch call points to a relative path. In a real application, you would
     // deploy the server-side logic and replace '/api/generate' with your actual API endpoint URL.
     // NOTE: For this example to work in a local dev environment, you would need to set up a proxy
@@ -48,6 +59,9 @@ export const combineImages = async (person: UploadedImage, clothingItems: Clothi
       },
       body: JSON.stringify(payload),
     });
+
+    console.log('📡 Response status:', response.status);
+    console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ message: 'An unknown server error occurred.' }));
