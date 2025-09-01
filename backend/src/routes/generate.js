@@ -117,9 +117,10 @@ router.post('/', [
 
         // Log request for debugging (in development)
         if (process.env.NODE_ENV === 'development') {
-            console.log(`🎨 Generating virtual try-on [${req.id}]`);
-            console.log(`   Person: ${person.mimeType}`);
-            console.log(`   Clothing items: ${Object.keys(clothingItems).join(', ')}`);
+            console.log(`🎨 Generating virtual try-on [${req.id || 'no-id'}]`);
+            console.log(`   Person: ${person ? person.mimeType : 'missing'}`);
+            console.log(`   Clothing items: ${clothingItems ? Object.keys(clothingItems).filter(key => clothingItems[key]).join(', ') : 'none'}`);
+            console.log(`   Request body keys: ${Object.keys(req.body).join(', ')}`);
         }
 
         // Generate virtual try-on image
