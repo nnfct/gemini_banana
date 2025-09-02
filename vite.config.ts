@@ -1,26 +1,21 @@
 import path from 'path';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig } from 'vite';
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, '.', '');
-  return {
-    define: {
-      'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+// Legacy Vite config for old monolith build.
+// Security: Do NOT inject any API keys into the frontend bundle.
+export default defineConfig({
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+      },
     },
-    server: {
-      proxy: {
-        '/api': {
-          target: 'http://localhost:3000',
-          changeOrigin: true,
-          secure: false
-        }
-      }
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, '.'),
     },
-    resolve: {
-      alias: {
-        '@': path.resolve(__dirname, '.'),
-      }
-    }
-  };
+  },
 });

@@ -33,6 +33,7 @@ export interface RecommendationRequest {
     person?: ApiFile;
     clothingItems?: ClothingItems;
     generatedImage?: string;
+    options?: RecommendationOptions;
 }
 
 export interface RecommendationItem {
@@ -55,6 +56,14 @@ export interface CategoryRecommendations {
 export interface RecommendationResponse {
     recommendations: RecommendationItem[] | CategoryRecommendations;
     error?: string;
+}
+
+// Recommendation options (aligns with backend API)
+export interface RecommendationOptions {
+    maxPerCategory?: number;
+    minPrice?: number;
+    maxPrice?: number;
+    excludeTags?: string[];
 }
 
 // Frontend State Types

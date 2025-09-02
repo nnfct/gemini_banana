@@ -45,7 +45,8 @@ const config = {
 
     // Upload and file handling
     upload: {
-        maxSize: parseInt(process.env.MAX_UPLOAD_SIZE) || 10 * 1024 * 1024, // 10MB
+        // Support both MAX_UPLOAD_SIZE and legacy MAX_FILE_SIZE envs
+        maxSize: parseInt(process.env.MAX_UPLOAD_SIZE || process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024, // 10MB
         allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
         quality: parseFloat(process.env.IMAGE_QUALITY) || 0.8
     },

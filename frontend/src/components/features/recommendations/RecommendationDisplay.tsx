@@ -9,7 +9,7 @@ interface RecommendationDisplayProps {
 
 export const RecommendationDisplay: React.FC<RecommendationDisplayProps> = ({
     recommendations,
-    onItemClick
+    onItemClick,
 }) => {
     // Lightweight inline placeholder (SVG) shown when product image fails to load
     const fallbackImage =
@@ -22,24 +22,25 @@ export const RecommendationDisplay: React.FC<RecommendationDisplayProps> = ({
                 </g>
             </svg>`
         );
+
     const formatPrice = (price: number) => {
-        return new Intl.NumberFormat('ko-KR').format(price) + '원';
+        return new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(price);
     };
 
     const renderCategory = (categoryName: string, items: RecommendationItem[]) => {
         if (items.length === 0) return null;
 
-        const categoryNames = {
+        const categoryNames: Record<string, string> = {
             top: '상의',
             pants: '하의',
             shoes: '신발',
-            accessories: '액세서리'
+            accessories: '액세서리',
         };
 
         return (
             <div className="mb-8" key={categoryName}>
                 <h3 className="text-xl font-semibold text-gray-800 mb-4">
-                    {categoryNames[categoryName as keyof typeof categoryNames] || categoryName}
+                    {categoryNames[categoryName] || categoryName}
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     {items.map((item) => (
@@ -71,8 +72,8 @@ export const RecommendationDisplay: React.FC<RecommendationDisplayProps> = ({
                             <div className="space-y-1">
                                 <p className="font-medium text-sm text-gray-900 line-clamp-2">{item.title}</p>
                                 <p className="font-semibold text-primary-600">{formatPrice(item.price)}</p>
-                                {item.score && (
-                                    <p className="text-xs text-gray-500">유사도: {item.score}</p>
+                                {item.score !== undefined && (
+                                    <p className="text-xs text-gray-500">유사도 {item.score}</p>
                                 )}
                             </div>
                         </Card>
@@ -82,20 +83,22 @@ export const RecommendationDisplay: React.FC<RecommendationDisplayProps> = ({
         );
     };
 
-    const hasAnyRecommendations = Object.values(recommendations).some((items: RecommendationItem[]) => items.length > 0);
+    const hasAnyRecommendations = Object.values(recommendations).some(
+        (items: RecommendationItem[]) => items.length > 0
+    );
 
     if (!hasAnyRecommendations) {
         return (
             <Card className="text-center py-8">
-                <h2 className="text-xl font-semibold text-gray-800 mb-2">추천 상품</h2>
-                <p className="text-gray-600">추천할 상품이 없습니다.</p>
+                <h2 className="text-xl font-semibold text-gray-800 mb-2">추천 제품</h2>
+                <p className="text-gray-600">추천된 제품이 없습니다.</p>
             </Card>
         );
     }
 
     return (
         <Card>
-            <h2 className="text-2xl font-bold text-gray-800 mb-6">유사한 상품 추천</h2>
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">유사 제품 추천</h2>
             <div>
                 {renderCategory('top', recommendations.top)}
                 {renderCategory('pants', recommendations.pants)}
@@ -105,3 +108,6 @@ export const RecommendationDisplay: React.FC<RecommendationDisplayProps> = ({
         </Card>
     );
 };
+
+export default RecommendationDisplay;
+
