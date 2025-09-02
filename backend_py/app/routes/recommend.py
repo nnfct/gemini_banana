@@ -7,21 +7,15 @@ from ..models import (
     CategoryRecommendations,
     RecommendationItem,
 )
+from ..services.catalog import get_catalog_service
 
 
 router = APIRouter(prefix="/api/recommend", tags=["Recommendations"])
 
 
-def _mock_recommendations() -> CategoryRecommendations:
-    # Minimal placeholder catalog results
-    top = [
-        RecommendationItem(id="top_001", title="Casual Cotton T-Shirt", price=25000, tags=["casual", "cotton", "basic"], category="top"),
-    ]
-    return CategoryRecommendations(top=top, pants=[], shoes=[], accessories=[])
-
-
 @router.get("/status")
 def status():
+    stats = get_catalog_service().stats()
     return {
         "aiService": {
             "available": True,
@@ -32,26 +26,50 @@ def status():
             },
         },
         "catalogService": {
-            "available": True,
-            "productCount": 1,
+            "available": stats.get("totalProducts", 0) > 0,
+            "productCount": stats.get("totalProducts", 0),
         },
     }
 
 
 @router.get("/catalog")
 def catalog_stats():
-    return {
-        "totalProducts": 1,
-        "categories": {"top": 1, "pants": 0, "shoes": 0, "accessories": 0},
-        "priceRange": {"min": 25000, "max": 25000, "average": 25000},
-    }
+    return get_catalog_service().stats()
 
 
 @router.post("")
 def recommend_from_upload(req: RecommendationRequest) -> RecommendationResponse:
-    recs = _mock_recommendations()
+    # Build analysis keywords from request (fallback style)
+    analysis = {}
+    # Minimal fallback keywords
+    if req.person:
+        analysis["overall_style"] = ["casual", "everyday"]
+    if req.clothingItems:
+        for k in ("top", "pants", "shoes"):
+            if getattr(req.clothingItems, k) is not None:
+                analysis.setdefault(k, []).extend([k, "basic", "casual"])
+
+    svc = get_catalog_service()
+    opts = req.options or {}
+    recs = svc.find_similar(
+        analysis,
+        max_per_category=(opts.maxPerCategory or 3) if hasattr(opts, "maxPerCategory") else 3,
+        include_score=True,
+        min_price=getattr(opts, "minPrice", None),
+        max_price=getattr(opts, "maxPrice", None),
+        exclude_tags=getattr(opts, "excludeTags", None),
+    )
+
+    # Convert lists of dicts to CategoryRecommendations model
+    as_model = CategoryRecommendations(
+        top=[RecommendationItem(**p) for p in recs.get("top", [])],
+        pants=[RecommendationItem(**p) for p in recs.get("pants", [])],
+        shoes=[RecommendationItem(**p) for p in recs.get("shoes", [])],
+        accessories=[RecommendationItem(**p) for p in recs.get("accessories", [])],
+    )
+
     return RecommendationResponse(
-        recommendations=recs,
+        recommendations=as_model,
         analysisMethod="fallback",
         requestId=f"req_{int(datetime.utcnow().timestamp())}",
         timestamp=datetime.utcnow().isoformat() + "Z",
@@ -60,11 +78,29 @@ def recommend_from_upload(req: RecommendationRequest) -> RecommendationResponse:
 
 @router.post("/from-fitting")
 def recommend_from_fitting(req: RecommendationFromFittingRequest) -> RecommendationResponse:
-    recs = _mock_recommendations()
+    # For fitting, seed analysis with overall style + categories
+    analysis = {"overall_style": ["casual", "relaxed"], "categories": ["top", "pants", "shoes"]}
+    svc = get_catalog_service()
+    opts = req.options or {}
+    recs = svc.find_similar(
+        analysis,
+        max_per_category=(opts.maxPerCategory or 3) if hasattr(opts, "maxPerCategory") else 3,
+        include_score=True,
+        min_price=getattr(opts, "minPrice", None),
+        max_price=getattr(opts, "maxPrice", None),
+        exclude_tags=getattr(opts, "excludeTags", None),
+    )
+
+    as_model = CategoryRecommendations(
+        top=[RecommendationItem(**p) for p in recs.get("top", [])],
+        pants=[RecommendationItem(**p) for p in recs.get("pants", [])],
+        shoes=[RecommendationItem(**p) for p in recs.get("shoes", [])],
+        accessories=[RecommendationItem(**p) for p in recs.get("accessories", [])],
+    )
+
     return RecommendationResponse(
-        recommendations=recs,
+        recommendations=as_model,
         analysisMethod="fallback",
         requestId=f"req_{int(datetime.utcnow().timestamp())}",
         timestamp=datetime.utcnow().isoformat() + "Z",
     )
-
