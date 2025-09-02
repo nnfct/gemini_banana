@@ -48,7 +48,8 @@
                     "server":  "node server.js",
                     "test-azure":  "node test-azure.js",
                     "test:backend-py:smoke":  "node scripts/test_py_backend.js",
-                    "ingest:realdata": "python backend_py/tools/ingest_csv_to_catalog.py"
+                    "ingest:realdata":  "python backend_py/tools/ingest_csv_to_catalog.py",
+                    "dev:py:auto":  "node scripts/run_backend_py.js"
                 },
     "devDependencies":  {
                             "concurrently":  "^8.2.2"
