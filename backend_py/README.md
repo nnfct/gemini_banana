@@ -64,7 +64,9 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 3000
 ### 엔드포인트
 - GET `/health`: 헬스 체크
 - GET `/api`: API 정보
-- POST `/api/generate`, GET `/api/generate/status`: 가상 피팅 스텁
+- POST `/api/generate`, GET `/api/generate/status`: 가상 피팅
+  - 기본은 스텁 응답
+  - `GENERATE_PROXY_TARGET` 환경변수를 설정하면 기존 Node 백엔드의 `/api/generate`로 프록시(예: `http://localhost:3000`)
 - POST `/api/recommend`, POST `/api/recommend/from-fitting`: 추천 스텁
 - GET `/api/recommend/status`, GET `/api/recommend/catalog`: 상태/카탈로그 통계
 

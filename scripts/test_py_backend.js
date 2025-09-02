@@ -18,9 +18,36 @@ async function waitFor(url, tries = 40, ms = 250) {
   return false;
 }
 
+function run(cmd, args, opts = {}) {
+  return new Promise((resolve, reject) => {
+    const p = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, ...opts });
+    let out = '';
+    let err = '';
+    p.stdout.on('data', (d) => (out += d.toString()));
+    p.stderr.on('data', (d) => (err += d.toString()));
+    p.on('close', (code) => (code === 0 ? resolve({ code, out, err }) : reject(new Error(err || `exit ${code}`))));
+  });
+}
+
+async function ensureVenvAndDeps() {
+  const venvWin = path.join(backendDir, '.venv', 'Scripts', 'python.exe');
+  const venvNix = path.join(backendDir, '.venv', 'bin', 'python');
+  const hasWin = await import('node:fs').then(({ existsSync }) => existsSync(venvWin));
+  const hasNix = await import('node:fs').then(({ existsSync }) => existsSync(venvNix));
+  if (!hasWin && !hasNix) {
+    console.log('Creating venv and installing dependencies...');
+    await run('python', ['-m', 'venv', '.venv'], { cwd: backendDir });
+  }
+  const py = hasWin ? venvWin : (hasNix ? venvNix : path.join(backendDir, '.venv', 'Scripts', 'python.exe'));
+  await run(py, ['-m', 'pip', 'install', '--upgrade', 'pip'], { cwd: backendDir }).catch(() => {});
+  await run(py, ['-m', 'pip', 'install', '-r', 'requirements.txt'], { cwd: backendDir });
+  return py;
+}
+
 async function main() {
+  const py = await ensureVenvAndDeps();
   console.log(`Starting FastAPI (uvicorn) on ${port}...`);
-  const uv = spawn('python', ['-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', port], {
+  const uv = spawn(py, ['-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', port], {
     cwd: backendDir,
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
@@ -74,4 +101,3 @@ main().catch((err) => {
   console.error('[smoke] failed:', err);
   process.exit(1);
 });
-

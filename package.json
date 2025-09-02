@@ -46,7 +46,9 @@
                     "docker:dev:down":  "docker-compose -f docker-compose.dev.yml down",
                     "docker:clean":  "docker-compose down -v --rmi all",
                     "server":  "node server.js",
-                    "test-azure":  "node test-azure.js",\n    "test:backend-py:smoke": "node scripts/test_py_backend.js"
+                    "test-azure":  "node test-azure.js",
+                    "test:backend-py:smoke":  "node scripts/test_py_backend.js",
+                    "ingest:realdata": "python backend_py/tools/ingest_csv_to_catalog.py"
                 },
     "devDependencies":  {
                             "concurrently":  "^8.2.2"
@@ -61,4 +63,3 @@
     "author":  "",
     "license":  "ISC"
 }
-

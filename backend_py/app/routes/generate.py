@@ -1,5 +1,7 @@
 from datetime import datetime
-from fastapi import APIRouter
+import os
+import httpx
+from fastapi import APIRouter, HTTPException
 from ..models import VirtualTryOnRequest, VirtualTryOnResponse
 
 
@@ -21,7 +23,25 @@ def status():
 
 @router.post("")
 def generate(req: VirtualTryOnRequest) -> VirtualTryOnResponse:
-    # Stub: return a tiny transparent PNG data URI
+    # Option 1: Proxy to existing Node backend if configured (recommended during migration)
+    proxy_target = os.getenv("GENERATE_PROXY_TARGET")
+    if proxy_target:
+        try:
+            url = proxy_target.rstrip("/") + "/api/generate"
+            resp = httpx.post(url, json=req.model_dump(), timeout=60)
+            resp.raise_for_status()
+            data = resp.json()
+            if not data.get("generatedImage"):
+                raise HTTPException(status_code=502, detail="Proxy responded without generatedImage")
+            return VirtualTryOnResponse(
+                generatedImage=data["generatedImage"],
+                requestId=data.get("requestId"),
+                timestamp=data.get("timestamp") or datetime.utcnow().isoformat() + "Z",
+            )
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=502, detail=f"Proxy error: {str(e)}")
+
+    # Option 2: Stub fallback (until native Python generation is implemented)
     placeholder = (
         "data:image/png;base64,"
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAAWgmWQ0AAAAASUVORK5CYII="
@@ -31,4 +51,3 @@ def generate(req: VirtualTryOnRequest) -> VirtualTryOnResponse:
         requestId=f"req_{int(datetime.utcnow().timestamp())}",
         timestamp=datetime.utcnow().isoformat() + "Z",
     )
-

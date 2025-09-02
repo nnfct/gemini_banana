@@ -69,6 +69,7 @@ npm run dev:py
 - GET `/health`
 - GET `/api`
 - POST `/api/generate`, GET `/api/generate/status`
+- (옵션) 이미지 생성 프록시: `GENERATE_PROXY_TARGET=http://localhost:3000` 설정 시 기존 Node 백엔드 `/api/generate`로 위임
 - POST `/api/recommend`, POST `/api/recommend/from-fitting`, GET `/api/recommend/status`, GET `/api/recommend/catalog`
 
 ### 왜 이 구성인가
