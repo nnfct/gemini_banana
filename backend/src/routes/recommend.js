@@ -1,4 +1,4 @@
-import { Router } from 'express';
+﻿import { Router } from 'express';
 import openaiService from '../services/openai.service.js';
 import catalogService from '../services/catalog.service.js';
 import { validateRequiredFields, validateFileUpload, ValidationError } from '../middleware/validation.js';
@@ -141,7 +141,7 @@ router.post('/', [
 
         // Log request for debugging (in development)
         if (process.env.NODE_ENV === 'development') {
-            console.log(`🔍 Generating recommendations from upload [${req.id}]`);
+            console.log(`?뵇 Generating recommendations from upload [${req.id}]`);
             console.log(`   Person: ${person ? person.mimeType : 'none'}`);
             console.log(`   Clothing items: ${Object.keys(clothingItems).join(', ') || 'none'}`);
         }
@@ -156,7 +156,7 @@ router.post('/', [
                 analysisMethod = 'ai';
 
                 if (process.env.NODE_ENV === 'development') {
-                    console.log('✅ AI style analysis completed');
+                    console.log('??AI style analysis completed');
                 }
             } catch (error) {
                 console.warn('AI style analysis failed, using fallback:', error.message);
@@ -213,7 +213,7 @@ router.post('/', [
         // Log success (in development)
         if (process.env.NODE_ENV === 'development') {
             const totalRecommendations = Object.values(recommendations).reduce((sum, items) => sum + items.length, 0);
-            console.log(`✅ Generated ${totalRecommendations} recommendations [${req.id}]`);
+            console.log(`??Generated ${totalRecommendations} recommendations [${req.id}]`);
         }
 
     } catch (error) {
@@ -319,7 +319,7 @@ router.post('/from-fitting', [
 
         // Log request for debugging (in development)
         if (process.env.NODE_ENV === 'development') {
-            console.log(`🔍 Generating recommendations from virtual try-on [${req.id}]`);
+            console.log(`?뵇 Generating recommendations from virtual try-on [${req.id}]`);
             console.log(`   Generated image: ${mimeType}`);
             console.log(`   Original items: ${Object.keys(originalClothingItems).join(', ') || 'none'}`);
         }
@@ -338,7 +338,7 @@ router.post('/from-fitting', [
                 analysisMethod = 'ai';
 
                 if (process.env.NODE_ENV === 'development') {
-                    console.log('✅ AI clothing analysis completed');
+                    console.log('??AI clothing analysis completed');
                 }
             } catch (error) {
                 console.warn('AI clothing analysis failed, using fallback:', error.message);
@@ -376,7 +376,7 @@ router.post('/from-fitting', [
         // Log success (in development)
         if (process.env.NODE_ENV === 'development') {
             const totalRecommendations = Object.values(filteredRecommendations).reduce((sum, items) => sum + items.length, 0);
-            console.log(`✅ Generated ${totalRecommendations} recommendations from fitting [${req.id}]`);
+            console.log(`??Generated ${totalRecommendations} recommendations from fitting [${req.id}]`);
         }
 
     } catch (error) {
@@ -586,4 +586,34 @@ function applyFiltersToRecommendations(recommendations, filters) {
     return filtered;
 }
 
+
+/**
+ * @api {get} /api/recommend/random Get random products
+ * @apiName GetRandomProducts
+ * @apiGroup Recommendations
+ * @apiVersion 1.0.0
+ *
+ * @apiDescription Returns a random list of products from the catalog.
+ *
+ * @apiQuery {Number} [limit=18] Number of products to return
+ * @apiQuery {String} [category] Optional category filter (top|pants|shoes)
+ */
+router.get('/random', asyncHandler(async (req, res) => {
+    const limit = Math.min(parseInt(req.query.limit) || 18, 100);
+    const category = (req.query.category || '').toString();
+
+    let products = catalogService.getAllProducts();
+    if (category && ['top','pants','shoes','accessories'].includes(category)) {
+        products = products.filter(p => p.category === category);
+    }
+
+    // Shuffle and take limit
+    for (let i = products.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [products[i], products[j]] = [products[j], products[i]];
+    }
+
+    res.json(products.slice(0, limit));
+}));
 export default router;
+

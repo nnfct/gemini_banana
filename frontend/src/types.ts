@@ -41,6 +41,7 @@ export interface RecommendationItem {
     title: string;
     price: number;
     imageUrl?: string;
+    productUrl?: string;
     score?: number;
     tags: string[];
     category: string;

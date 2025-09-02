@@ -83,6 +83,8 @@ class GeminiService {
      */
     _buildRequestParts(person, clothingItems) {
         const parts = [
+            // Global safety/consistency directives
+            { text: this._buildSafetyDirectives() },
             {
                 inlineData: {
                     data: person.base64,
@@ -132,6 +134,22 @@ class GeminiService {
     }
 
     /**
+     * Safety + consistency directives to ensure the person's face/body is never altered
+     * and to keep background and lighting consistent. Applied to every request.
+     * @private
+     */
+    _buildSafetyDirectives() {
+        return [
+            'IMPORTANT SAFETY AND CONSISTENCY DIRECTIVES:',
+            '- Do NOT alter the person\'s face, hair, body shape, or pose.',
+            '- Preserve the exact facial identity (no beautification, smoothing, makeup changes).',
+            '- Keep background, perspective, and lighting consistent with the original person image.',
+            '- Only composite the clothing onto the person realistically; do not add or remove accessories.',
+            '- Output must be a single photorealistic image. No text, watermarks, or annotations.',
+        ].join('\n');
+    }
+
+    /**
      * Build prompt text for virtual try-on
      * @private
      * @param {Array} clothingPieces - Array of clothing piece names
@@ -142,7 +160,7 @@ class GeminiService {
             throw new Error('At least one clothing item is required');
         }
 
-        return `Analyze the first image, which contains a person (assume it's a full-body shot). Your primary task is to realistically place the clothing items from the subsequent images onto this person. It is of the utmost importance to preserve the original person's identity with no alterations. This means the facial features, face shape, hair, body shape, and pose must remain identical to the original photo. Do not change the person in any way. The final output must be a photorealistic image of the exact same person wearing: ${clothingPieces.join(', ')}. Ensure the clothing fits naturally, and the lighting and shadows are consistent with the original photo. Do not include any text or annotations in the final image.`;
+        return `Analyze the first image, which contains a person (assume it's a full-body shot). Your primary task is to realistically place the clothing items from the subsequent images onto this person. It is CRITICAL to preserve the original person's identity with no alterations. The facial features, face shape, hair, body shape, and pose must remain identical to the original photo. Do not change the person in any way. The final output must be a photorealistic image of the exact same person wearing: ${clothingPieces.join(', ')}. Ensure the clothing fits naturally, and the lighting and shadows are consistent with the original photo. Do not include any text, logos, or annotations in the final image.`;
     }
 
     /**

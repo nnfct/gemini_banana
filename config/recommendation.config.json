@@ -1,0 +1,9 @@
+{
+  "weights": {
+    "exact": 1.0,
+    "partial": 0.5
+  },
+  "scoreThreshold": 0.0,
+  "maxPerCategory": 3
+}
+

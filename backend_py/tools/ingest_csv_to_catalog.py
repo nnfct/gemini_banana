@@ -59,7 +59,7 @@ def split_tags(text: Optional[str], delim: str) -> List[str]:
     return [t.strip() for t in str(text).split(delim) if t.strip()]
 
 
-def map_row(row: Dict[str, str], idx: int, tags_delim: str) -> Dict:
+def map_row(row: Dict[str, str], idx: int, tags_delim: str, forced_category: Optional[str] = None) -> Dict:
     # 컬럼 키 노멀라이즈
     lower = {norm_key(k): v for k, v in row.items()}
 
@@ -74,6 +74,8 @@ def map_row(row: Dict[str, str], idx: int, tags_delim: str) -> Dict:
         "imageurl", "image_url", "image", "img_url", "이미지url", "이미지", "대표이미지",
         "product_img_u",  # musinsa
     ])
+
+    product_url = pick(["product_u", "product_url", "상품url", "링크", "url"]) or None
 
     # id 추출: 명시 id -> URL 내 숫자 -> auto
     def extract_id_from_url(u: Optional[str]) -> Optional[str]:
@@ -96,15 +98,28 @@ def map_row(row: Dict[str, str], idx: int, tags_delim: str) -> Dict:
     brand = pick(["brand", "브랜드", "product_b"]) or None
     base_tags = split_tags(tags_field, tags_delim)
 
+    # 강제 카테고리 지정이 있으면 우선 적용
+    if forced_category:
+        category = forced_category
     # 카테고리 대략 추정(없을 때)
     if not category:
         lt = " ".join([title] + base_tags).lower()
-        top_kw = ["hoodie", "shirt", "t-shirt", "sweatshirt", "sweater", "cardigan", "knit", "top",
-                  "후드", "셔츠", "티셔츠", "맨투맨", "니트", "가디건", "블라우스"]
-        pants_kw = ["jeans", "slacks", "pants", "denim", "skirt",
-                    "바지", "슬랙스", "데님", "청바지", "진", "스커트"]
-        shoes_kw = ["shoes", "sneakers", "boots", "loafers",
-                    "신발", "스니커즈", "운동화", "부츠", "로퍼"]
+        top_kw = [
+            # EN tops/outer
+            "hoodie", "shirt", "t-shirt", "sweatshirt", "sweater", "cardigan", "knit", "top",
+            "jacket", "coat", "jumper", "blouson", "parka", "padding", "down",
+            # KO
+            "후드", "셔츠", "티셔츠", "맨투맨", "니트", "가디건", "블라우스",
+            "자켓", "재킷", "코트", "점퍼", "블루종", "아우터", "패딩", "다운"
+        ]
+        pants_kw = [
+            "jeans", "slacks", "pants", "denim", "skirt",
+            "바지", "슬랙스", "데님", "청바지", "진", "스커트"
+        ]
+        shoes_kw = [
+            "shoes", "sneakers", "boots", "loafers",
+            "신발", "스니커즈", "운동화", "부츠", "로퍼"
+        ]
         if any(w in lt for w in top_kw):
             category = "top"
         elif any(w in lt for w in pants_kw):
@@ -134,18 +149,19 @@ def map_row(row: Dict[str, str], idx: int, tags_delim: str) -> Dict:
         "title": str(title),
         "price": int(price),
         "imageUrl": image_val or None,
+        "productUrl": product_url or None,
         "tags": tags,
         "category": category,
     }
 
 
-def read_csv_file(path: Path, tags_delim: str) -> List[Dict]:
+def read_csv_file(path: Path, tags_delim: str, forced_category: Optional[str] = None) -> List[Dict]:
     items: List[Dict] = []
     with path.open("r", encoding="utf-8", newline="") as f:
         reader = csv.DictReader(f)
         for i, row in enumerate(reader, start=1):
             try:
-                items.append(map_row(row, i, tags_delim))
+                items.append(map_row(row, i, tags_delim, forced_category))
             except Exception as e:
                 print(f"[WARN] {path.name} #{i} 변환 실패: {e}")
     return items
@@ -157,6 +173,7 @@ def main():
     ap.add_argument("--output", "-o", default=str(DEFAULT_OUTPUT), help="출력 JSON 경로 (기본: data/catalog.json)")
     ap.add_argument("--tags-delim", default=",", help="tags 컬럼 구분자 (기본: ,)")
     ap.add_argument("--merge-existing", action="store_true", help="출력 파일이 존재하면 기존 JSON과 병합(id 중복 시 신규 우선)")
+    ap.add_argument("--force-category", choices=["top", "pants", "shoes"], help="모든 입력 레코드의 카테고리를 강제 지정(top/pants/shoes)")
     args = ap.parse_args()
 
     inputs: List[Path] = []
@@ -179,7 +196,7 @@ def main():
             print(f"[WARN] 파일 없음: {p}")
             continue
         print(f"[INGEST] CSV 읽는 중: {p}")
-        items = read_csv_file(p, args.tags_delim)
+        items = read_csv_file(p, args.tags_delim, args.force_category)
         all_items.extend(items)
 
     if not all_items:

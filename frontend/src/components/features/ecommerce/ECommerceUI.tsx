@@ -1,72 +1,58 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, Button } from '../../ui';
+import type { RecommendationItem } from '../../../types';
 
-const topNavItems = ['콘텐츠', '추천', '랭킹', '세일', '브랜드', '발매', '뷰티 페스타', '월간 입점회'];
-
-const carouselItems = [
-    { brand: '써머택트', name: '[2PACK] 와이드 하이 퍼포먼스 헤드밴드', price: '16,800원' },
-    { brand: '업게이트', name: '[2PACK] 심리스 스포츠 헤어밴드 러닝 헤...', price: '18,900원' },
-    { brand: '뉴발란스', name: 'NBPFFS151T / SC Trainer V3 (남성 D...', price: '249,000원' },
-    { brand: '아식스', name: '젤-카야노 레거시 - (IVORY/BLACK)', price: '199,000원' },
-];
-
-const productItems = [
-    { brand: '라이크더모스트', name: '어웨이 엘티엠 라운드 오버 티셔츠_차콜', discount: '58%', price: '16,600원', image: 'https://placehold.co/400x500/333333/FFFFFF?text=Item+1' },
-    { brand: '더콜디스트모먼트', name: 'TCM back logo den im pants (navy)', discount: '30%', price: '76,300원', image: 'https://placehold.co/400x500/2d3748/FFFFFF?text=Item+2' },
-    { brand: '라이크더모스트', name: '더즌트 LTMT 오버 후디_블랙', discount: '50%', price: '29,900원', image: 'https://placehold.co/400x500/1a202c/FFFFFF?text=Item+3' },
-    { brand: '나이스고스트클럽', name: '3STARS SYMBOL CROP SLIM TEE,...', discount: '30%', price: '27,300원', image: 'https://placehold.co/400x500/4a5568/FFFFFF?text=Item+4' },
-    { brand: '아디다스', name: '카모플라주 후드 집업 - 블랙 / JY2775', price: '135,000원', image: 'https://placehold.co/400x500/718096/FFFFFF?text=Item+5' },
-    { brand: '나이스고스트클럽', name: 'NGC BOY HOODIE ZIP UP_GREY(NG...', discount: '30%', price: '69,300원', image: 'https://placehold.co/400x500/a0aec0/FFFFFF?text=Item+6' },
-];
-
-interface ProductCardProps {
-    item: {
-        brand: string;
-        name: string;
-        price: string;
-        discount?: string;
-        image?: string;
-    };
+function formatPriceKRW(n: number) {
+    return new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(n);
 }
 
+const useRandomProducts = (limit: number = 18) => {
+    const [items, setItems] = useState<RecommendationItem[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const fetchItems = async () => {
+        setLoading(true); setError(null);
+        try {
+            const res = await fetch(`/api/recommend/random?limit=${limit}`);
+            const data = await res.json();
+            setItems(data);
+        } catch (e: any) {
+            setError(e?.message || 'failed');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { fetchItems(); }, []);
+    return { items, loading, error, refresh: fetchItems };
+};
+
+interface ProductCardProps { item: RecommendationItem }
 const ProductCard: React.FC<ProductCardProps> = ({ item }) => (
-    <Card padding="sm" className="hover:shadow-md transition-shadow duration-200">
+    <Card padding="sm" className="hover:shadow-md transition-shadow duration-200" onClick={() => item.productUrl && window.open(item.productUrl, '_blank', 'noopener,noreferrer')}>
         <div className="relative aspect-[4/5] bg-gray-100 rounded-lg mb-2 overflow-hidden">
-            {item.image && (
-                <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+            {item.imageUrl && (
+                <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
             )}
-            <div className="absolute top-2 right-2 bg-white/50 p-1 rounded-full">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
-            </div>
         </div>
-        <p className="font-bold text-sm truncate">{item.brand}</p>
-        <p className="text-xs text-gray-600 truncate h-8">{item.name}</p>
-        {item.discount ? (
-            <p className="text-sm font-bold">
-                <span className="text-red-500">{item.discount}</span> {item.price}
-            </p>
-        ) : (
-            <p className="text-sm font-bold">{item.price}</p>
-        )}
+        <p className="font-bold text-sm truncate">{item.tags?.[0] || '브랜드'}</p>
+        <p className="text-xs text-gray-600 truncate h-8">{item.title}</p>
+        <p className="text-sm font-bold">{formatPriceKRW(item.price)}</p>
     </Card>
 );
 
 export const ECommerceUI: React.FC = () => {
+    const { items, loading, error, refresh } = useRandomProducts(18);
+    const carousel = items.slice(0, 8);
+    const gridItems = items.slice(8);
     return (
         <div className="bg-white font-sans">
             <header className="sticky top-0 bg-white z-10 shadow-sm">
                 <div className="overflow-x-auto whitespace-nowrap">
                     <nav className="flex items-center space-x-4 p-3 text-sm font-medium">
-                        {topNavItems.map((item, index) => (
-                            <a
-                                href="#"
-                                key={item}
-                                className={`pb-1 ${index === 1 ? 'text-black border-b-2 border-black font-bold' : 'text-gray-500'}`}
-                            >
-                                {item}
-                            </a>
+                        {['콘텐츠','추천','랭킹','세일','브랜드','발매','뷰티','시간특가'].map((item, index) => (
+                            <a href="#" key={item} className={`pb-1 ${index === 1 ? 'text-black border-b-2 border-black font-bold' : 'text-gray-500'}`}>{item}</a>
                         ))}
                     </nav>
                 </div>
@@ -75,38 +61,34 @@ export const ECommerceUI: React.FC = () => {
             <main className="p-4 space-y-6">
                 <section>
                     <div className="overflow-x-auto whitespace-nowrap flex space-x-4">
-                        {carouselItems.map(item => (
-                            <div key={item.name} className="flex-shrink-0 w-40">
-                                <div className="relative aspect-square bg-gray-100 rounded-lg mb-2"></div>
-                                <p className="font-bold text-sm truncate">{item.brand}</p>
-                                <p className="text-xs text-gray-600 truncate">{item.name}</p>
-                                <p className="text-sm font-bold">{item.price}</p>
+                        {carousel.map(item => (
+                            <div key={item.id} className="flex-shrink-0 w-40" onClick={() => item.productUrl && window.open(item.productUrl, '_blank', 'noopener,noreferrer')}>
+                                <div className="relative aspect-square bg-gray-100 rounded-lg mb-2 overflow-hidden">
+                                    {item.imageUrl && <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />}
+                                </div>
+                                <p className="font-bold text-sm truncate">{item.tags?.[0] || '브랜드'}</p>
+                                <p className="text-xs text-gray-600 truncate">{item.title}</p>
+                                <p className="text-sm font-bold">{formatPriceKRW(item.price)}</p>
                             </div>
                         ))}
                     </div>
                 </section>
 
-                <Button className="w-full" size="lg">
-                    무신사 플레이어에서 더보기
+                <Button className="w-full" size="lg" onClick={refresh}>
+                    실데이터로 새로고침
                 </Button>
 
                 <section>
                     <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-lg font-bold">스트리트 스타일 브랜드 아이템 추천</h2>
-                        <a href="#" className="text-xs text-gray-500">더보기</a>
+                        <h2 className="text-lg font-bold">실제 인기 아이템</h2>
+                        <Button onClick={refresh} size="sm">새로고침</Button>
                     </div>
                     <div className="grid grid-cols-3 gap-4">
-                        {productItems.map(item => <ProductCard key={item.name} item={item} />)}
-                    </div>
-                </section>
-
-                <section>
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-lg font-bold">눈에 띄는 신규 입점 브랜드 상품</h2>
-                        <a href="#" className="text-xs text-gray-500">더보기</a>
+                        {gridItems.map(item => <ProductCard key={item.id} item={item} />)}
                     </div>
                 </section>
             </main>
         </div>
     );
 };
+

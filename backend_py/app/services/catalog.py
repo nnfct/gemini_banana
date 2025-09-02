@@ -10,6 +10,7 @@ from typing import Dict, List, Optional, Tuple
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 DEFAULT_CATALOG_PATH = ROOT_DIR / "data" / "catalog.json"
+REC_CONFIG_PATH = ROOT_DIR / "config" / "recommendation.config.json"
 
 
 @dataclass
@@ -18,12 +19,16 @@ class CatalogServiceConfig:
     max_recommendations: int = 10
     score_threshold: float = 0.0
     categories: Tuple[str, ...] = ("top", "pants", "shoes", "accessories")
+    exact_weight: float = 1.0
+    partial_weight: float = 0.5
+    rec_config_path: Path = Path(os.getenv("REC_CONFIG_PATH", str(REC_CONFIG_PATH)))
 
 
 class CatalogService:
     def __init__(self, config: Optional[CatalogServiceConfig] = None) -> None:
         self.config = config or CatalogServiceConfig()
         self._catalog: List[Dict] = []
+        self._load_rec_config()
         self._load()
 
     def _load(self) -> None:
@@ -39,6 +44,22 @@ class CatalogService:
         except Exception as e:
             print(f"[CatalogService] Failed to load catalog: {e}")
             self._catalog = []
+
+    def _load_rec_config(self) -> None:
+        try:
+            path = self.config.rec_config_path
+            if path.exists():
+                data = json.loads(path.read_text(encoding="utf-8"))
+                weights = data.get("weights", {})
+                self.config.exact_weight = float(weights.get("exact", self.config.exact_weight))
+                self.config.partial_weight = float(weights.get("partial", self.config.partial_weight))
+                if "scoreThreshold" in data:
+                    self.config.score_threshold = float(data.get("scoreThreshold", self.config.score_threshold))
+                if "maxPerCategory" in data:
+                    self.config.max_recommendations = int(data.get("maxPerCategory", self.config.max_recommendations))
+                print(f"[CatalogService] Loaded recommendation config from {path}")
+        except Exception as e:
+            print(f"[CatalogService] Failed to load recommendation config: {e}")
 
     def reload(self) -> bool:
         try:
@@ -80,11 +101,11 @@ class CatalogService:
         for kw in keywords:
             kw_l = kw.lower()
             if kw_l in item_text:
-                score += 1.0
+                score += self.config.exact_weight
             else:
                 # partial match on token
                 if any(tok for tok in kw_l.split() if tok and tok in item_text):
-                    score += 0.5
+                    score += self.config.partial_weight
         return score
 
     def search(self, keywords: List[str], *, categories: Optional[List[str]] = None, max_results: int = 10,
@@ -135,4 +156,3 @@ class CatalogService:
 @lru_cache(maxsize=1)
 def get_catalog_service() -> CatalogService:
     return CatalogService()
-

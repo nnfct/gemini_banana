@@ -36,6 +36,29 @@ def status():
 def catalog_stats():
     return get_catalog_service().stats()
 
+@router.get("/random")
+def random_products(limit: int = 18, category: str | None = None):
+    svc = get_catalog_service()
+    products = svc.get_all()
+    if category in {"top", "pants", "shoes", "accessories"}:
+        products = [p for p in products if p.get("category") == category]
+
+    import random
+    random.shuffle(products)
+    result = []
+    for p in products[: min(max(limit, 1), 100)]:
+        item = {
+            "id": str(p.get("id")),
+            "title": p.get("title") or "",
+            "price": int(p.get("price") or 0),
+            "imageUrl": p.get("imageUrl"),
+            "productUrl": p.get("productUrl"),
+            "tags": p.get("tags") or [],
+            "category": p.get("category") or "top",
+        }
+        result.append(item)
+    return result
+
 
 @router.post("")
 def recommend_from_upload(req: RecommendationRequest) -> RecommendationResponse:
