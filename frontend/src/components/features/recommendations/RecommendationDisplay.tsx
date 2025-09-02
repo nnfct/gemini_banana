@@ -27,6 +27,17 @@ export const RecommendationDisplay: React.FC<RecommendationDisplayProps> = ({
         return new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(price);
     };
 
+    // pagination state and helper for refresh
+    const [page, setPage] = useState(0);
+    const visiblePerCategory = 3;
+
+    const getPagedItems = (items: RecommendationItem[]) => {
+        if (!items || items.length <= visiblePerCategory) return items || [];
+        const start = (page * visiblePerCategory) % items.length;
+        const end = start + visiblePerCategory;
+        return end <= items.length ? items.slice(start, end) : [...items.slice(start), ...items.slice(0, end - items.length)];
+    };
+
     const renderCategory = (categoryName: string, items: RecommendationItem[]) => {
         if (items.length === 0) return null;
 
@@ -115,6 +126,9 @@ export const RecommendationDisplay: React.FC<RecommendationDisplayProps> = ({
 };
 
 export default RecommendationDisplay;
+
+
+
 
 
 

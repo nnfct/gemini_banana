@@ -8,6 +8,7 @@ from ..models import (
     RecommendationItem,
 )
 from ..services.catalog import get_catalog_service
+from ..services.llm_ranker import llm_ranker
 
 
 router = APIRouter(prefix="/api/recommend", tags=["Recommendations"])
@@ -74,14 +75,42 @@ def recommend_from_upload(req: RecommendationRequest) -> RecommendationResponse:
 
     svc = get_catalog_service()
     opts = req.options or {}
-    recs = svc.find_similar(
+    # get more candidates for potential LLM rerank
+    candidate_recs = svc.find_similar(
         analysis,
-        max_per_category=(opts.maxPerCategory or 3) if hasattr(opts, "maxPerCategory") else 3,
+        max_per_category=(opts.maxPerCategory or 3) * 4 if hasattr(opts, "maxPerCategory") else 12,
         include_score=True,
         min_price=getattr(opts, "minPrice", None),
         max_price=getattr(opts, "maxPrice", None),
         exclude_tags=getattr(opts, "excludeTags", None),
     )
+
+    # Optional LLM rerank
+    max_k = (opts.maxPerCategory or 3) if hasattr(opts, "maxPerCategory") else 3
+    use_llm = getattr(opts, "useLLMRerank", False)
+    if use_llm and llm_ranker.available():
+        ids = llm_ranker.rerank(analysis, candidate_recs, top_k=max_k)
+        if ids:
+            # reorder by ids
+            recs = {cat: [] for cat in candidate_recs.keys()}
+            for cat in candidate_recs.keys():
+                # map id->item
+                idx = {str(p["id"]): p for p in candidate_recs[cat]}
+                for _id in ids.get(cat, []):
+                    if _id in idx:
+                        recs[cat].append(idx[_id])
+            # fill if not enough
+            for cat in recs.keys():
+                if len(recs[cat]) < max_k:
+                    for p in candidate_recs[cat]:
+                        if p not in recs[cat]:
+                            recs[cat].append(p)
+                        if len(recs[cat]) >= max_k:
+                            break
+        else:
+            recs = {cat: (candidate_recs[cat][:max_k]) for cat in candidate_recs.keys()}
+    else:
+        recs = {cat: (candidate_recs[cat][:max_k]) for cat in candidate_recs.keys()}
 
     # Convert lists of dicts to CategoryRecommendations model
     as_model = CategoryRecommendations(
@@ -105,14 +134,35 @@ def recommend_from_fitting(req: RecommendationFromFittingRequest) -> Recommendat
     analysis = {"overall_style": ["casual", "relaxed"], "categories": ["top", "pants", "shoes"]}
     svc = get_catalog_service()
     opts = req.options or {}
-    recs = svc.find_similar(
+    candidate_recs = svc.find_similar(
         analysis,
-        max_per_category=(opts.maxPerCategory or 3) if hasattr(opts, "maxPerCategory") else 3,
+        max_per_category=(opts.maxPerCategory or 3) * 4 if hasattr(opts, "maxPerCategory") else 12,
         include_score=True,
         min_price=getattr(opts, "minPrice", None),
         max_price=getattr(opts, "maxPrice", None),
         exclude_tags=getattr(opts, "excludeTags", None),
     )
+
+    max_k = (opts.maxPerCategory or 3) if hasattr(opts, "maxPerCategory") else 3
+    use_llm = getattr(opts, "useLLMRerank", False)
+    if use_llm and llm_ranker.available():
+        ids = llm_ranker.rerank(analysis, candidate_recs, top_k=max_k)
+        if ids:
+            recs = {cat: [] for cat in candidate_recs.keys()}
+            for cat in candidate_recs.keys():
+                idx = {str(p["id"]): p for p in candidate_recs[cat]}
+                for _id in ids.get(cat, []):
+                    if _id in idx:
+                        recs[cat].append(idx[_id])
+                for p in candidate_recs[cat]:
+                    if len(recs[cat]) >= max_k:
+                        break
+                    if p not in recs[cat]:
+                        recs[cat].append(p)
+        else:
+            recs = {cat: (candidate_recs[cat][:max_k]) for cat in candidate_recs.keys()}
+    else:
+        recs = {cat: (candidate_recs[cat][:max_k]) for cat in candidate_recs.keys()}
 
     as_model = CategoryRecommendations(
         top=[RecommendationItem(**p) for p in recs.get("top", [])],
