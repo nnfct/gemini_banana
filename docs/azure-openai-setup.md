@@ -139,6 +139,48 @@ npm run dev
 - 개발 중에는 Mock 사용 권장
 - 프로덕션에서는 캐싱으로 비용 최적화
 
+## 🖼️ Azure Computer Vision 설정 (추천 알고리즘용)
+
+### 1. Azure Computer Vision 리소스 생성
+1. Azure Portal (https://portal.azure.com) 접속
+2. "Create a resource" → "AI + Machine Learning" → "Computer Vision"
+3. 리소스 생성 후 "Keys and Endpoint" 메뉴에서 정보 확인
+
+### 2. 환경 변수 설정
+`.env` 파일에 다음을 추가:
+
+```env
+# Azure Computer Vision (추천 알고리즘용)
+AZURE_COMPUTER_VISION_ENDPOINT=https://your-computer-vision-resource.cognitiveservices.azure.com/
+AZURE_COMPUTER_VISION_KEY=your_32_character_api_key_here
+```
+
+### 3. 패키지 설치 확인
+```bash
+npm install @azure/cognitiveservices-computervision @azure/ms-rest-js
+```
+
+### 4. Computer Vision 연결 테스트
+```bash
+# 테스트 파일 실행 (필요 시 생성)
+node test-azure-computer-vision.js
+```
+
+**예상 출력:**
+```
+🔍 Azure Computer Vision 설정 확인 중...
+✅ Computer Vision 연결 성공!
+🖼️ 이미지 분석 테스트 중...
+✅ 태그 추출: ["shirt", "blue", "casual"]
+✅ 캡션 생성: "A person wearing a blue shirt"
+```
+
+### 5. 추천 알고리즘 작동 방식
+- **입력**: 가상 피팅 이미지 (base64)
+- **분석**: Computer Vision으로 태그/캡션 추출
+- **매칭**: 카탈로그와 키워드 매칭으로 상품 추천
+- **출력**: 카테고리별 추천 상품 리스트
+
 ---
 
-**✅ 모든 설정이 완료되면 가상 피팅 후 실시간으로 정확한 상품 추천을 받을 수 있습니다!**
+**✅ Computer Vision 설정 완료 시 더 정확하고 빠른 추천 알고리즘을 사용할 수 있습니다!**

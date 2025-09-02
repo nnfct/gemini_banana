@@ -5,7 +5,7 @@ import { ResultDisplay } from './ResultDisplay';
 import { Header } from './Header';
 import { CombineButton } from './CombineButton';
 import RecommendationDisplay from './RecommendationDisplay';
-import { combineImages, getRecommendationsFromFitting } from '../services/geminiService';
+import { VirtualTryOnService } from '../frontend/src/services/virtualTryOn.service';
 import type { UploadedImage } from '../types';
 
 export const VirtualTryOnUI: React.FC = () => {
@@ -19,6 +19,8 @@ export const VirtualTryOnUI: React.FC = () => {
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  const virtualTryOnService = new VirtualTryOnService();
+
   const handleCombineClick = useCallback(async () => {
     if (!personImage || (!topImage && !pantsImage && !shoesImage)) {
       setError('Please upload a person\'s image and at least one clothing item.');
@@ -31,22 +33,32 @@ export const VirtualTryOnUI: React.FC = () => {
     setRecommendations(null);
 
     try {
-      const result = await combineImages(personImage, {
-        top: topImage,
-        pants: pantsImage,
-        shoes: shoesImage,
-      });
-      
-      if (result) {
-        setGeneratedImage(result);
-        
+      const request = {
+        person: {
+          base64: personImage.base64,
+          mimeType: personImage.mimeType,
+        },
+        clothingItems: {
+          top: topImage ? { base64: topImage.base64, mimeType: topImage.mimeType } : null,
+          pants: pantsImage ? { base64: pantsImage.base64, mimeType: pantsImage.mimeType } : null,
+          shoes: shoesImage ? { base64: shoesImage.base64, mimeType: shoesImage.mimeType } : null,
+        }
+      };
+      const result = await virtualTryOnService.combineImages(request);
+
+      if (result.generatedImage) {
+        setGeneratedImage(result.generatedImage);
+
         // 가상 피팅 완료 후 추천 상품 가져오기
         setIsLoadingRecommendations(true);
         try {
-          const recommendationsResult = await getRecommendationsFromFitting(result, {
-            top: topImage,
-            pants: pantsImage,
-            shoes: shoesImage,
+          const recommendationsResult = await virtualTryOnService.getRecommendations({
+            person: personImage,
+            clothingItems: {
+              top: topImage,
+              pants: pantsImage,
+              shoes: shoesImage,
+            }
           });
           setRecommendations(recommendationsResult.recommendations);
         } catch (recError) {
@@ -65,7 +77,7 @@ export const VirtualTryOnUI: React.FC = () => {
       setIsLoading(false);
     }
   }, [personImage, topImage, pantsImage, shoesImage]);
-  
+
   const canCombine = personImage && (topImage || pantsImage || shoesImage);
 
   return (
@@ -76,37 +88,37 @@ export const VirtualTryOnUI: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             {/* Input Section */}
             <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <ImageUploader
-                        id="person-image"
-                        title="Person"
-                        description="Upload a full-body photo."
-                        onImageUpload={setPersonImage}
-                    />
-                    <ImageUploader
-                        id="top-image"
-                        title="Top"
-                        description="Upload a photo of a top."
-                        onImageUpload={setTopImage}
-                    />
-                    <ImageUploader
-                        id="pants-image"
-                        title="Pants"
-                        description="Upload a photo of pants."
-                        onImageUpload={setPantsImage}
-                    />
-                    <ImageUploader
-                        id="shoes-image"
-                        title="Shoes"
-                        description="Upload a photo of shoes."
-                        onImageUpload={setShoesImage}
-                    />
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <ImageUploader
+                  id="person-image"
+                  title="Person"
+                  description="Upload a full-body photo."
+                  onImageUpload={setPersonImage}
+                />
+                <ImageUploader
+                  id="top-image"
+                  title="Top"
+                  description="Upload a photo of a top."
+                  onImageUpload={setTopImage}
+                />
+                <ImageUploader
+                  id="pants-image"
+                  title="Pants"
+                  description="Upload a photo of pants."
+                  onImageUpload={setPantsImage}
+                />
+                <ImageUploader
+                  id="shoes-image"
+                  title="Shoes"
+                  description="Upload a photo of shoes."
+                  onImageUpload={setShoesImage}
+                />
+              </div>
             </div>
 
             {/* Action and Result Section */}
             <div className="flex flex-col gap-6">
-               <CombineButton
+              <CombineButton
                 onClick={handleCombineClick}
                 disabled={!canCombine || isLoading}
                 isLoading={isLoading}
@@ -118,7 +130,7 @@ export const VirtualTryOnUI: React.FC = () => {
               />
             </div>
           </div>
-          
+
           {/* Recommendations Section */}
           {(recommendations || isLoadingRecommendations) && (
             <div className="mt-8">
@@ -130,7 +142,7 @@ export const VirtualTryOnUI: React.FC = () => {
                   </div>
                 </div>
               ) : recommendations ? (
-                <RecommendationDisplay 
+                <RecommendationDisplay
                   recommendations={recommendations}
                   onItemClick={(item) => {
                     console.log('Clicked item:', item);

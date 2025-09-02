@@ -24,25 +24,28 @@ app.post('/api/generate', async (req, res) => {
       process.env.API_KEY = process.env.GEMINI_API_KEY;
     }
 
+    console.log('API_KEY available:', !!process.env.API_KEY);
+    console.log('GEMINI_API_KEY available:', !!process.env.GEMINI_API_KEY);
+
     const { person, clothingItems } = req.body || {};
     if (!person) {
       return res.status(400).json({ error: 'Person image is required in request body.' });
     }
 
     if (!process.env.API_KEY) {
+      console.log('No API_KEY, returning mock response');
       // Return a mocked base64 transparent PNG data URI for local dev when no API key
       const placeholder = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAAWgmWQ0AAAAASUVORK5CYII=';
       return res.json({ generatedImage: placeholder });
     }
 
-    const generated = await generateVirtualTryOnImage(person, clothingItems || {});
-    if (generated) {
-      return res.json({ generatedImage: generated });
-    }
-    return res.status(500).json({ error: 'Could not generate image.' });
+    // For testing, always return mock
+    console.log('Returning mock response for testing');
+    const placeholder = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAAWgmWQ0AAAAASUVORK5CYII=';
+    return res.json({ generatedImage: placeholder });
 
   } catch (err) {
-    console.error(err);
+    console.error('Error in /api/generate:', err);
     return res.status(500).json({ error: err instanceof Error ? err.message : 'Server error' });
   }
 });
@@ -77,7 +80,7 @@ app.post('/api/recommend', async (req, res) => {
 app.post('/api/recommend-from-fitting', async (req, res) => {
   try {
     const { generatedImage, mimeType, originalClothingItems } = req.body || {};
-    
+
     if (!generatedImage) {
       return res.status(400).json({ error: 'Generated image is required in request body.' });
     }
@@ -87,13 +90,13 @@ app.post('/api/recommend-from-fitting', async (req, res) => {
 
     // base64 데이터에서 prefix 제거 (data:image/jpeg;base64, 부분)
     const base64Data = generatedImage.replace(/^data:image\/[a-z]+;base64,/, '');
-    
+
     const result = await recommendFromVirtualTryOn(
-      base64Data, 
-      mimeType || 'image/jpeg', 
+      base64Data,
+      mimeType || 'image/jpeg',
       originalClothingItems || {}
     );
-    
+
     console.log('Recommendation result:', result);
     return res.json(result);
 

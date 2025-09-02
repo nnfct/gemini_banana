@@ -1,23 +1,18 @@
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import OpenAI from 'openai';
+import { ComputerVisionClient } from '@azure/cognitiveservices-computervision';
+import { ApiKeyCredentials } from '@azure/ms-rest-js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const catalog = JSON.parse(readFileSync(join(__dirname, '../data/catalog.json'), 'utf8'));
 
-// Azure OpenAI 클라이언트 설정
-let openaiClient = null;
-if (process.env.AZURE_OPENAI_ENDPOINT && process.env.AZURE_OPENAI_KEY) {
-    openaiClient = new OpenAI({
-        apiKey: process.env.AZURE_OPENAI_KEY,
-        baseURL: `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${process.env.AZURE_OPENAI_DEPLOYMENT_ID}`,
-        defaultQuery: { 'api-version': '2024-02-15-preview' },
-        defaultHeaders: {
-            'api-key': process.env.AZURE_OPENAI_KEY,
-        },
-    });
+// Azure Computer Vision 클라이언트 설정
+let computerVisionClient = null;
+if (process.env.AZURE_COMPUTER_VISION_ENDPOINT && process.env.AZURE_COMPUTER_VISION_KEY) {
+    const credentials = new ApiKeyCredentials({ inHeader: { 'Ocp-Apim-Subscription-Key': process.env.AZURE_COMPUTER_VISION_KEY } });
+    computerVisionClient = new ComputerVisionClient(credentials, process.env.AZURE_COMPUTER_VISION_ENDPOINT);
 }
 
 /**
@@ -28,83 +23,42 @@ if (process.env.AZURE_OPENAI_ENDPOINT && process.env.AZURE_OPENAI_KEY) {
  * @returns {Promise<object>} - 추천 상품 목록
  */
 export const recommendFromVirtualTryOn = async (generatedImageBase64, mimeType = 'image/jpeg', originalClothingItems = {}) => {
-    // Azure OpenAI가 설정되어 있지 않은 경우 mock 추천 반환
-    if (!openaiClient) {
-        console.log('Azure OpenAI not configured, using mock recommendations');
+    // Azure Computer Vision이 설정되어 있지 않은 경우 mock 추천 반환
+    if (!computerVisionClient) {
+        console.log('Azure Computer Vision not configured, using mock recommendations');
         return getMockRecommendations(originalClothingItems);
     }
 
     try {
-        console.log('Analyzing virtual try-on image with Azure OpenAI Vision...');
-        
-        // Azure OpenAI Vision API를 사용하여 실제 이미지 분석
-        const analysisPrompt = `
-이 이미지는 사람이 옷을 입은 가상 피팅 결과입니다. 
-이미지를 자세히 분석하여 착용하고 있는 의류의 특징을 파악해주세요.
+        console.log('Analyzing virtual try-on image with Azure Computer Vision...');
 
-다음 JSON 형태로만 응답해주세요 (다른 텍스트 없이):
-{
-    "top": ["색상", "스타일", "패턴", "핏"],
-    "pants": ["색상", "스타일", "핏", "길이"],
-    "shoes": ["색상", "스타일", "타입"],
-    "overall_style": ["캐주얼/포멀", "시즌감", "연령대"]
-}
+        // Base64를 Buffer로 변환
+        const imageBuffer = Buffer.from(generatedImageBase64, 'base64');
 
-예시:
-{
-    "top": ["black", "hoodie", "oversized", "casual"],
-    "pants": ["blue", "jeans", "straight", "regular"],
-    "shoes": ["white", "sneakers", "casual"],
-    "overall_style": ["casual", "street", "young"]
-}
-`;
-
-        const response = await openaiClient.chat.completions.create({
-            model: process.env.AZURE_OPENAI_DEPLOYMENT_ID || 'gpt-4-vision-preview',
-            messages: [
-                {
-                    role: 'user',
-                    content: [
-                        {
-                            type: 'text',
-                            text: analysisPrompt
-                        },
-                        {
-                            type: 'image_url',
-                            image_url: {
-                                url: `data:${mimeType};base64,${generatedImageBase64}`,
-                                detail: 'high'
-                            }
-                        }
-                    ]
-                }
-            ],
-            max_tokens: 500,
-            temperature: 0.1
+        // Computer Vision API로 이미지 분석 (태그와 캡션 추출)
+        const analysisResult = await computerVisionClient.analyzeImageInStream(imageBuffer, {
+            visualFeatures: ['Tags', 'Description']
         });
 
-        const analysisText = response.choices[0]?.message?.content;
-        console.log('Azure OpenAI Analysis:', analysisText);
+        // 태그와 캡션 추출
+        const tags = analysisResult.tags ? analysisResult.tags.map(tag => tag.name) : [];
+        const captions = analysisResult.description ? analysisResult.description.captions.map(cap => cap.text) : [];
 
-        // JSON 파싱 시도
-        let analysis;
-        try {
-            // JSON 부분만 추출 (```json이나 다른 마크다운 제거)
-            const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
-            const jsonString = jsonMatch ? jsonMatch[0] : analysisText;
-            analysis = JSON.parse(jsonString);
-        } catch (parseError) {
-            console.error('Failed to parse Azure OpenAI response as JSON:', parseError);
-            console.log('Raw response:', analysisText);
-            // 파싱 실패 시 mock 사용
-            return getMockRecommendations(originalClothingItems);
-        }
+        console.log('Computer Vision Tags:', tags);
+        console.log('Computer Vision Captions:', captions);
+
+        // 분석 결과를 구조화
+        const analysis = {
+            tags: tags,
+            captions: captions,
+            overall_style: [] // 추가 분석 필요 시 확장
+        };
 
         console.log('Parsed analysis:', analysis);
         return findSimilarProducts(analysis);
 
     } catch (error) {
-        console.error('Error analyzing virtual try-on image with Azure OpenAI:', error);
+        console.error('Error analyzing virtual try-on image with Azure Computer Vision:', error);
         // 오류 발생 시 mock 추천 반환
         return getMockRecommendations(originalClothingItems);
     }
@@ -115,10 +69,8 @@ export const recommendFromVirtualTryOn = async (generatedImageBase64, mimeType =
  */
 function findSimilarProducts(analysis) {
     const allKeywords = [
-        ...(analysis.top || []),
-        ...(analysis.pants || []),
-        ...(analysis.shoes || []),
-        ...(analysis.overall_style || [])
+        ...(analysis.tags || []),
+        ...(analysis.captions || [])
     ];
 
     const recommendations = {
@@ -134,14 +86,19 @@ function findSimilarProducts(analysis) {
         let score = 0;
 
         allKeywords.forEach(keyword => {
+            // 정확한 매칭
             if (itemText.includes(keyword.toLowerCase())) {
-                score++;
+                score += 1;
+            }
+            // 부분 매칭 (예: "blue shirt"에서 "blue"만 매칭)
+            else if (keyword.split(' ').some(word => itemText.includes(word.toLowerCase()))) {
+                score += 0.5;
             }
         });
 
         if (score > 0) {
             const itemWithScore = { ...item, score };
-            
+
             // 카테고리별 분류 (tags 기반)
             if (item.tags.some(tag => ['shirt', 'top', 'hoodie', 't-shirt'].includes(tag.toLowerCase()))) {
                 recommendations.top.push(itemWithScore);
@@ -189,7 +146,7 @@ function getMockRecommendations(originalClothingItems) {
 export const recommendSimilarItems = async (person, clothingItems = {}) => {
     // For MVP, we'll do simple mock recommendations based on available items
     // In a real implementation, this would analyze the images using Azure OpenAI
-    
+
     let mockKeywords = [];
     let itemType = 'clothing';
 
@@ -219,8 +176,8 @@ export const recommendSimilarItems = async (person, clothingItems = {}) => {
         });
         return { ...item, score };
     }).filter(item => item.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 5); // Return top 5 recommendations
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5); // Return top 5 recommendations
 
     return { recommendations: scoredItems };
 };

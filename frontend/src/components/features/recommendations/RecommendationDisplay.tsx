@@ -11,6 +11,17 @@ export const RecommendationDisplay: React.FC<RecommendationDisplayProps> = ({
     recommendations,
     onItemClick
 }) => {
+    // Lightweight inline placeholder (SVG) shown when product image fails to load
+    const fallbackImage =
+        'data:image/svg+xml;utf8,' +
+        encodeURIComponent(
+            `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+                <rect width="100%" height="100%" fill="#f3f4f6"/>
+                <g fill="#9ca3af" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+                    <text x="50%" y="50%" font-size="20" dy=".3em">이미지를 불러올 수 없습니다</text>
+                </g>
+            </svg>`
+        );
     const formatPrice = (price: number) => {
         return new Intl.NumberFormat('ko-KR').format(price) + '원';
     };
@@ -44,7 +55,11 @@ export const RecommendationDisplay: React.FC<RecommendationDisplayProps> = ({
                                         alt={item.title}
                                         className="w-full h-full object-cover"
                                         onError={(e) => {
-                                            (e.target as HTMLImageElement).style.display = 'none';
+                                            const img = e.currentTarget as HTMLImageElement;
+                                            // Prevent infinite loop if fallback also fails
+                                            if (img.src !== fallbackImage) {
+                                                img.src = fallbackImage;
+                                            }
                                         }}
                                     />
                                 ) : (
