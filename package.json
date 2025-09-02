@@ -10,9 +10,12 @@
   ],
   "scripts": {
     "dev": "concurrently --names \"BACKEND,FRONTEND\" --prefix-colors \"blue,green\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:py": "concurrently --names \"PY,FRONTEND\" --prefix-colors \"magenta,green\" \"npm run dev:backend-py\" \"npm run dev:frontend:py\"",
     "dev:ordered": "node scripts/dev.js",
     "dev:backend": "cd backend && npm run dev",
+    "dev:backend-py": "cd backend_py && python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 3001",
     "dev:frontend": "cd frontend && npm run dev",
+    "dev:frontend:py": "cd frontend && cross-env VITE_API_URL=http://localhost:3001 npm run dev",
     "dev:backend-only": "cd backend && npm run dev",
     "dev:frontend-only": "cd frontend && npm run dev",
     "build": "npm run build:backend && npm run build:frontend",
