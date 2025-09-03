@@ -51,22 +51,49 @@ class LLMRanker:
             return None
 
         def fmt_items(items: List[Dict]) -> str:
-            # Keep it short to save tokens
+            # Keep it short, but expose color/fit to the LLM explicitly
+            COLOR_WORDS = {
+                # EN
+                "black", "white", "gray", "grey", "navy", "blue", "light blue", "sky",
+                "red", "pink", "purple", "violet", "green", "olive", "khaki",
+                "yellow", "beige", "brown", "cream", "ivory", "orange",
+                # KO
+                "블랙", "화이트", "회색", "그레이", "네이비", "파랑", "블루", "라이트 블루", "하늘", "하늘색",
+                "빨강", "레드", "핑크", "보라", "퍼플", "초록", "그린", "올리브", "카키",
+                "노랑", "옐로", "베이지", "브라운", "갈색", "크림", "아이보리", "오렌지", "주황",
+            }
+            FIT_WORDS = {
+                # EN
+                "slim", "regular", "relaxed", "oversized", "loose", "wide", "tapered",
+                "straight", "bootcut", "flare", "baggy", "skinny",
+                # KO
+                "슬림", "레귤러", "릴렉스", "릴렉스드", "오버사이즈", "루즈", "와이드", "테이퍼드",
+                "스트레이트", "부츠컷", "플레어", "배기", "스키니",
+            }
             rows = []
             for it in items[: 20]:
+                tags = list(it.get("tags") or [])
+                colors = [t for t in tags if t and t.lower() in COLOR_WORDS]
+                fit = [t for t in tags if t and t.lower() in FIT_WORDS]
                 rows.append({
                     "id": str(it.get("id")),
-                    "title": it.get("title", "")[:120],
-                    "tags": (it.get("tags") or [])[:6],
+                    "title": (it.get("title", "") or "")[:120],
                     "price": int(it.get("price", 0)),
+                    "colors": colors[:3],
+                    "fit": fit[:3],
+                    "tags": tags[:8],
                 })
             return json.dumps(rows, ensure_ascii=False)
 
         prompt = (
-            "You are a fashion recommendation assistant. Given user's style analysis and candidate items per category, "
-            "select the best items for each category. Return ONLY JSON with keys top, pants, shoes, accessories, "
-            "each value a list of item id strings (length up to {k}).\n\n".format(k=top_k)
-        )
+            "You are a fashion recommendation assistant. Prioritize COLOR and SHAPE/FIT matching.\n"
+            "Ranking rules (in order):\n"
+            "1) Color match: prefer items whose colors overlap with analysis.colors or analysis.dominantColors.\n"
+            "2) Shape/Fit: prefer items whose fit (e.g., slim/straight/wide/oversized/etc.) matches the analysis.\n"
+            "3) Style/Category: align with detected styles/categories; avoid obviously mismatched categories.\n"
+            "4) If tie: prefer reasonable price and diversity across items.\n\n"
+            "Return ONLY JSON with keys top, pants, shoes, accessories. Each value is a list of item id strings (max {k})."
+        ).format(k=top_k)
         style_json = json.dumps(analysis or {}, ensure_ascii=False)
         cats_payload = {
             cat: fmt_items(items) for cat, items in candidates.items()

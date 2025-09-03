@@ -139,14 +139,16 @@ class AzureOpenAIService:
     def _style_prompt() -> str:
         return (
             "Analyze the provided person/clothing images and output ONLY JSON with keys: "
-            "detected_style, colors, categories, style_preference. Be concise."
+            "detected_style, colors, categories, style_preference, fit, silhouette. "
+            "Where 'fit' is a short list like [slim, regular, relaxed, oversized, wide, straight, tapered], and "
+            "'silhouette' are shape terms like [straight, bootcut, flare, skinny, baggy]. Be concise and consistent."
         )
 
     @staticmethod
     def _vto_prompt() -> str:
         return (
             "Analyze this virtual try-on image and output ONLY JSON with keys: "
-            "top, pants, shoes, overall_style (each an array of concise attributes)."
+            "top, pants, shoes, overall_style, colors, fit, silhouette (arrays of concise attributes)."
         )
 
 

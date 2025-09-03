@@ -6,11 +6,12 @@ import time
 from typing import Any, Dict, List, Optional
 
 
-def _get_env(name: str, default: Optional[str] = None) -> Optional[str]:
+def _get_env(name: str, default: str | None = None) -> str:
     # Support both GEMINI_API_KEY and API_KEY for parity with Node code
     if name == "GEMINI_API_KEY":
-        return os.getenv("GEMINI_API_KEY") or os.getenv("API_KEY") or default
-    return os.getenv(name, default)
+        return (os.getenv("GEMINI_API_KEY") or os.getenv("API_KEY") or (default or ""))
+    # Standard env with fallback to default or empty string
+    return os.getenv(name) or (default or "")
 
 
 class GeminiImageService:
@@ -23,9 +24,11 @@ class GeminiImageService:
 
     Env vars:
       GEMINI_API_KEY or API_KEY
+      GEMINI_API_KEYS (optional, comma/semicolon/space-separated)
       GEMINI_MODEL (default: gemini-2.5-flash-image-preview)
       GEMINI_TIMEOUT_MS (default: 30000)
       GEMINI_MAX_RETRIES (default: 3)
+      GEMINI_TEMPERATURE (default: 0.0)
     """
 
     def __init__(self) -> None:
@@ -47,6 +50,8 @@ class GeminiImageService:
         self.model: str = _get_env("GEMINI_MODEL", "gemini-2.5-flash-image-preview")  # noqa: E501
         self.timeout_ms: int = int(_get_env("GEMINI_TIMEOUT_MS", "30000") or 30000)
         self.max_retries: int = int(_get_env("GEMINI_MAX_RETRIES", "3") or 3)
+        # Unified temperature: single source of truth
+        self.temperature: float = float(_get_env("GEMINI_TEMPERATURE", "0.0") or 0.0)
 
         self._new_client = None  # type: ignore[var-annotated]
         self._legacy_model = None  # type: ignore[var-annotated]
@@ -171,6 +176,8 @@ class GeminiImageService:
             model=self.model,
             # Align to docs: wrap parts in a user Content object
             contents=[{"role": "user", "parts": norm_parts}],
+            # Prefer image output; temperature unified via self.temperature
+            config={"response_modalities": ["IMAGE"], "temperature": self.temperature},
         )
 
         return self._extract_image_from_response(resp)
@@ -192,7 +199,14 @@ class GeminiImageService:
                     "data": p["inline_data"].get("data"),
                 })
 
-        resp = self._legacy_model.generate_content(legacy_inputs)
+        try:
+            resp = self._legacy_model.generate_content(  # type: ignore[assignment]
+                legacy_inputs,
+                generation_config={"temperature": self.temperature},
+            )
+        except TypeError:
+            # For older SDKs without generation_config support
+            resp = self._legacy_model.generate_content(legacy_inputs)
         return self._extract_image_from_response(resp)
 
     @staticmethod
@@ -224,25 +238,33 @@ class GeminiImageService:
         except Exception:
             return None
 
+    # --------------------------- prompt helpers ------------------------------ #
     @staticmethod
     def _safety_directives() -> str:
         return "\n".join([
-            "IMPORTANT SAFETY AND CONSISTENCY DIRECTIVES:",
-            "- Do NOT alter the person's face, hair, body shape, or pose.",
-            "- Preserve the exact facial identity (no beautification or smoothing).",
-            "- Keep background and lighting consistent with the original person image.",
-            "- Only composite the clothing onto the person realistically; no extra elements.",
-            "- Output must be a single photorealistic image. No text or watermarks.",
+            "CRITICAL SAFETY AND CONSISTENCY DIRECTIVES:",
+            "- The FIRST image MUST be used as the definitive source for the person's face and overall appearance.",
+            "- ABSOLUTELY NO re-synthesis, redrawing, retouching, or alteration of the person's face is permitted.",
+            "- The person's face, including but not limited to: facial structure, landmarks, skin texture, pores, moles, scars, facial hair (if any), hairline, eye shape, nose shape, mouth shape, and expression, MUST remain IDENTICAL and UNCHANGED.",
+            "- Preserve the EXACT facial identity. NO beautification, smoothing, makeup application, or landmark adjustments.",
+            "- DO NOT CHANGE THE PERSON'S FACE SHAPE OR FACIAL STRUCTURE.",
+            "- Maintain the background, perspective, and lighting IDENTICALLY to the original person image.",
+            "- Only composite the clothing from subsequent images onto the person realistically and seamlessly, ensuring the ENTIRE PERSON is visible.",
+            "- Do NOT add or remove accessories or objects. No text, logos, or watermarks.",
+            "- Treat the face region as STRICTLY PIXEL-LOCKED: identity-specific details MUST remain unchanged and untouched.",
+            "- If any instruction conflicts with another, the preservation of the person's facial identity and the integrity of the face shape are the ABSOLUTE HIGHEST PRIORITIES.",
         ])
 
     @staticmethod
     def _prompt_text(clothing_pieces: List[str]) -> str:
         items = ", ".join(clothing_pieces)
         return (
-            "Analyze the first image (the person). Realistically place the clothing items from the "
-            f"subsequent images onto this person. The final output must be the exact same person wearing: {items}. "
-            "Preserve facial features, hair, body shape, and pose exactly; do not alter the person. Ensure natural fit "
-            "and consistent lighting/shadows. Do not add any text or annotations."
+            "Use the FIRST image as the absolute base for the person's face and body. Composite the clothing from the subsequent images onto the person as distinct layers. "
+            f"STRICTLY preserve the person's identity: face shape, all facial landmarks, exact expression, hairline, skin texture, body shape, and pose must remain IDENTICAL and UNCHANGED. "
+            f"Ensure the ENTIRE PERSON is visible in the output image. "
+            f"Output a single, photorealistic image of the SAME person wearing: {items}. "
+            "Ensure the clothing fit is natural, with correct perspective, occlusion, and shadows. If any conflict arises, ALWAYS prioritize preserving the person's identity and the integrity of the face shape over clothing fit or appearance. "
+            "Do not include any text, logos, or watermarks."
         )
 
 

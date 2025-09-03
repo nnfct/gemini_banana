@@ -82,12 +82,17 @@ class GeminiService {
      * @returns {Array} Array of request parts
      */
     _buildRequestParts(person, clothingItems) {
+        // Helper to convert base64 -> bytes for @google/genai (expects Uint8Array)
+        const toBytes = (b64) => {
+            try { return Buffer.from(b64, 'base64'); } catch { return Buffer.alloc(0); }
+        };
+
         const parts = [
             // Global safety/consistency directives
             { text: this._buildSafetyDirectives() },
             {
                 inlineData: {
-                    data: person.base64,
+                    data: toBytes(person.base64),
                     mimeType: person.mimeType,
                 },
             },
@@ -99,7 +104,7 @@ class GeminiService {
         if (clothingItems.top) {
             parts.push({
                 inlineData: {
-                    data: clothingItems.top.base64,
+                    data: toBytes(clothingItems.top.base64),
                     mimeType: clothingItems.top.mimeType
                 }
             });
@@ -109,7 +114,7 @@ class GeminiService {
         if (clothingItems.pants) {
             parts.push({
                 inlineData: {
-                    data: clothingItems.pants.base64,
+                    data: toBytes(clothingItems.pants.base64),
                     mimeType: clothingItems.pants.mimeType
                 }
             });
@@ -119,7 +124,7 @@ class GeminiService {
         if (clothingItems.shoes) {
             parts.push({
                 inlineData: {
-                    data: clothingItems.shoes.base64,
+                    data: toBytes(clothingItems.shoes.base64),
                     mimeType: clothingItems.shoes.mimeType
                 }
             });
@@ -141,11 +146,15 @@ class GeminiService {
     _buildSafetyDirectives() {
         return [
             'IMPORTANT SAFETY AND CONSISTENCY DIRECTIVES:',
-            '- Do NOT alter the person\'s face, hair, body shape, or pose.',
-            '- Preserve the exact facial identity (no beautification, smoothing, makeup changes).',
-            '- Keep background, perspective, and lighting consistent with the original person image.',
-            '- Only composite the clothing onto the person realistically; do not add or remove accessories.',
-            '- Output must be a single photorealistic image. No text, watermarks, or annotations.',
+            '- Use the FIRST image as the immutable base/background.',
+            "- Do NOT re-synthesize, redraw, or retouch the person.",
+            "- Do NOT alter the person's face, hair, facial expression, skin texture, body shape, or pose.",
+            '- Preserve the exact facial identity (no beautification, smoothing, makeup or landmark changes).',
+            '- Keep background, perspective, and lighting IDENTICAL to the original person image.',
+            '- Only composite the clothing from the subsequent images onto the person realistically.',
+            '- Do NOT add or remove accessories or objects. No text, logos, or watermarks.',
+            "- Treat the face region as pixel-locked: identity-specific details MUST remain unchanged.",
+            "- If any instruction conflicts, ALWAYS preserve the person's identity over clothing fit.",
         ].join('\n');
     }
 
@@ -160,7 +169,7 @@ class GeminiService {
             throw new Error('At least one clothing item is required');
         }
 
-        return `Analyze the first image, which contains a person (assume it's a full-body shot). Your primary task is to realistically place the clothing items from the subsequent images onto this person. It is CRITICAL to preserve the original person's identity with no alterations. The facial features, face shape, hair, body shape, and pose must remain identical to the original photo. Do not change the person in any way. The final output must be a photorealistic image of the exact same person wearing: ${clothingPieces.join(', ')}. Ensure the clothing fits naturally, and the lighting and shadows are consistent with the original photo. Do not include any text, logos, or annotations in the final image.`;
+        return `Use the FIRST image as the base. Composite the clothing from the subsequent images onto the person as layers. STRICTLY preserve the person: face shape, landmarks, expression, hairline, skin texture, body shape, and pose must remain IDENTICAL. Do not redraw or resynthesize the person. Output a single photorealistic image of the SAME person wearing: ${clothingPieces.join(', ')}. Ensure the clothing fits naturally (correct perspective, occlusion, and shadows). If there is any conflict, prefer preserving the person's identity over altering the person. Do not include text, logos, or watermarks.`;
     }
 
     /**
@@ -178,10 +187,16 @@ class GeminiService {
                 const response = await Promise.race([
                     client.models.generateContent({
                         model: this.config.model,
-                        contents: { parts },
-                        config: {
-                            responseModalities: [Modality.IMAGE, Modality.TEXT],
+                        // Pass a single user message with parts (required by @google/genai)
+                        contents: [{ role: 'user', parts }],
+                        // Strong global instruction to preserve identity
+                        systemInstruction: {
+                            role: 'system',
+                            parts: [{ text: this._buildSafetyDirectives() }],
                         },
+                        // Prefer image output and reduce randomness
+                        config: { responseModalities: [Modality.IMAGE] },
+                        generationConfig: { temperature: 0.0 },
                     }),
                     new Promise((_, reject) =>
                         setTimeout(() => reject(new Error('Request timeout')), this.config.timeout)

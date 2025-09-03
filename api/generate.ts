@@ -24,6 +24,10 @@ if (!process.env.API_KEY) {
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+const toBytes = (b64: string): Uint8Array => {
+  try { return Buffer.from(b64, 'base64'); } catch { return Buffer.alloc(0); }
+};
+
 /**
  * The core server-side logic for combining images using the Gemini API.
  * This function should be called by your API endpoint handler.
@@ -36,7 +40,7 @@ export const generateVirtualTryOnImage = async (person: ApiFile, clothingItems: 
     const parts: any[] = [
       {
         inlineData: {
-          data: person.base64,
+          data: toBytes(person.base64),
           mimeType: person.mimeType,
         },
       },
@@ -45,28 +49,42 @@ export const generateVirtualTryOnImage = async (person: ApiFile, clothingItems: 
     const clothingPieces: string[] = [];
 
     if (clothingItems.top) {
-      parts.push({ inlineData: { data: clothingItems.top.base64, mimeType: clothingItems.top.mimeType } });
+      parts.push({ inlineData: { data: toBytes(clothingItems.top.base64), mimeType: clothingItems.top.mimeType } });
       clothingPieces.push('the top');
     }
     if (clothingItems.pants) {
-      parts.push({ inlineData: { data: clothingItems.pants.base64, mimeType: clothingItems.pants.mimeType } });
+      parts.push({ inlineData: { data: toBytes(clothingItems.pants.base64), mimeType: clothingItems.pants.mimeType } });
       clothingPieces.push('the pants');
     }
     if (clothingItems.shoes) {
-      parts.push({ inlineData: { data: clothingItems.shoes.base64, mimeType: clothingItems.shoes.mimeType } });
+      parts.push({ inlineData: { data: toBytes(clothingItems.shoes.base64), mimeType: clothingItems.shoes.mimeType } });
       clothingPieces.push('the shoes');
     }
 
-    const promptText = `Analyze the first image, which contains a person (assume it's a full-body shot). Your primary task is to realistically place the clothing items from the subsequent images onto this person. It is of the utmost importance to preserve the original person's identity with no alterations. This means the facial features, face shape, hair, body shape, and pose must remain identical to the original photo. Do not change the person in any way. The final output must be a photorealistic image of the exact same person wearing: ${clothingPieces.join(', ')}. Ensure the clothing fits naturally, and the lighting and shadows are consistent with the original photo. Do not include any text or annotations in the final image.`;
+    const promptText = `Use the FIRST image as the base. Composite the clothing from the subsequent images onto the person as layers. STRICTLY preserve the person: face shape, landmarks, expression, hairline, skin texture, body shape, and pose must remain IDENTICAL. Do not redraw or resynthesize the person. Output a single photorealistic image of the SAME person wearing: ${clothingPieces.join(', ')}. Ensure the clothing fits naturally (correct perspective, occlusion, and shadows). If there is any conflict, prefer preserving the person's identity. Do not include text, logos, or watermarks.`;
     
     parts.push({ text: promptText });
     
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image-preview',
-      contents: { parts },
-      config: {
-        responseModalities: [Modality.IMAGE, Modality.TEXT],
+      contents: [{ role: 'user', parts }],
+      systemInstruction: {
+        role: 'system',
+        parts: [{ text: [
+          'IMPORTANT SAFETY AND CONSISTENCY DIRECTIVES:',
+          '- Use the FIRST image as the immutable base/background.',
+          "- Do NOT re-synthesize, redraw, or retouch the person.",
+          "- Do NOT alter the person's face, hair, facial expression, skin texture, body shape, or pose.",
+          '- Preserve the exact facial identity (no beautification, smoothing, makeup or landmark changes).',
+          '- Keep background, perspective, and lighting IDENTICAL to the original person image.',
+          '- Only composite the clothing from subsequent images onto the person realistically.',
+          '- Do NOT add or remove accessories or objects. No text, logos, or watermarks.',
+          "- Treat the face region as pixel-locked: identity-specific details MUST remain unchanged.",
+          "- If any instruction conflicts, ALWAYS preserve the person\'s identity over clothing fit.",
+        ].join('\n') }]
       },
+      config: { responseModalities: [Modality.IMAGE] },
+      generationConfig: { temperature: 0.0 },
     });
 
     if (response.candidates?.[0]?.content?.parts) {
