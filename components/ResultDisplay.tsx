@@ -14,6 +14,15 @@ interface ResultDisplayProps {
 export const ResultDisplay: React.FC<ResultDisplayProps> = ({ generatedImage, isLoading, error }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
 
+  const PLACEHOLDER_DATA_URIS = new Set([
+    // 1x1 transparent PNG used by backend stubs (Node & Python)
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAAWgmWQ0AAAAASUVORK5CYII=',
+  ]);
+
+  const isPlaceholder = !!generatedImage && (
+    PLACEHOLDER_DATA_URIS.has(generatedImage) || generatedImage.length < 100
+  );
+
   return (
     <>
       <div className="w-full aspect-[4/3] bg-white border border-gray-200 rounded-2xl flex justify-center items-center p-4 shadow-sm relative overflow-hidden">
@@ -33,7 +42,7 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({ generatedImage, is
           </div>
         )}
 
-        {!isLoading && !error && generatedImage && (
+        {!isLoading && !error && generatedImage && !isPlaceholder && (
           <div className="relative w-full h-full group">
             <img src={generatedImage} alt="Generated result" className="w-full h-full object-contain rounded-lg" />
             <button
@@ -46,11 +55,15 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({ generatedImage, is
           </div>
         )}
 
-        {!isLoading && !error && !generatedImage && (
+        {!isLoading && !error && (isPlaceholder || !generatedImage) && (
           <div className="flex flex-col items-center gap-2 text-gray-400 text-center">
               <ImageIcon className="w-10 h-10" />
               <h4 className="font-semibold text-gray-600">Your Result</h4>
-              <p className="text-sm">The generated image will appear here.</p>
+              {isPlaceholder ? (
+                <p className="text-sm">AI 설정이 필요하거나, 합성 결과가 비었습니다.</p>
+              ) : (
+                <p className="text-sm">The generated image will appear here.</p>
+              )}
           </div>
         )}
       </div>

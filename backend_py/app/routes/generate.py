@@ -38,18 +38,18 @@ def generate(req: VirtualTryOnRequest) -> VirtualTryOnResponse:
                 person=req.person.model_dump(),
                 clothing_items=(req.clothingItems.model_dump() if req.clothingItems else {}),
             )
-            if not result:
-                raise HTTPException(status_code=502, detail="Gemini response contained no image")
-            return VirtualTryOnResponse(
-                generatedImage=result,
-                requestId=f"req_{int(datetime.utcnow().timestamp())}",
-                timestamp=datetime.utcnow().isoformat() + "Z",
-            )
-        except HTTPException:
-            raise
+            if result:
+                return VirtualTryOnResponse(
+                    generatedImage=result,
+                    requestId=f"req_{int(datetime.utcnow().timestamp())}",
+                    timestamp=datetime.utcnow().isoformat() + "Z",
+                )
+            else:
+                # No image returned: log and gracefully fall back
+                print("[generate] Gemini returned no image; falling back to proxy/placeholder")
         except Exception as e:
-            # fall through to proxy or placeholder
-            print(f"[generate] Python Gemini error: {e}")
+            # Log and fall back (do not surface 502 from this stage)
+            print(f"[generate] Python Gemini error, falling back: {e}")
 
     # Option B: Proxy to existing Node backend if configured (recommended during migration)
     proxy_target = os.getenv("GENERATE_PROXY_TARGET")

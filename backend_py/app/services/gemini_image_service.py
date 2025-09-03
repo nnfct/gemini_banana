@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import base64
 import time
 from typing import Any, Dict, List, Optional
 
@@ -28,7 +29,21 @@ class GeminiImageService:
     """
 
     def __init__(self) -> None:
-        self.api_key: Optional[str] = _get_env("GEMINI_API_KEY")
+        # Support multiple keys via GEMINI_API_KEYS (comma/semicolon/space-separated)
+        multi = _get_env("GEMINI_API_KEYS")
+        if multi:
+            toks = [t.strip() for t in str(multi).replace(";", ",").replace(" ", ",").split(",") if t and t.strip()]
+            self.api_keys: List[str] = toks
+        else:
+            single = _get_env("GEMINI_API_KEY")
+            if single:
+                self.api_keys = [single]
+            else:
+                alt = _get_env("API_KEY")
+                self.api_keys = [alt] if alt else []
+
+        # Keep the first key as current for status reporting
+        self.api_key: Optional[str] = self.api_keys[0] if self.api_keys else None
         self.model: str = _get_env("GEMINI_MODEL", "gemini-2.5-flash-image-preview")  # noqa: E501
         self.timeout_ms: int = int(_get_env("GEMINI_TIMEOUT_MS", "30000") or 30000)
         self.max_retries: int = int(_get_env("GEMINI_MAX_RETRIES", "3") or 3)
@@ -52,7 +67,7 @@ class GeminiImageService:
 
     # ------------------------------- public API ------------------------------- #
     def available(self) -> bool:
-        return bool(self.api_key and (self._new_genai or self._legacy_genai))
+        return bool(self.api_keys and (self._new_genai or self._legacy_genai))
 
     def generate_virtual_try_on_image(self, person: Dict, clothing_items: Dict | None = None) -> Optional[str]:
         """
@@ -70,21 +85,25 @@ class GeminiImageService:
         parts = self._build_parts(person, clothing_items)
 
         last_error: Optional[Exception] = None
-        for attempt in range(1, self.max_retries + 1):
-            try:
-                if self._new_genai:
-                    image_data_uri = self._call_new_genai(parts)
-                else:
-                    image_data_uri = self._call_legacy_genai(parts)
-
-                return image_data_uri
-            except Exception as e:  # noqa: BLE001 - we want to log/propagate
-                last_error = e
-                # Exponential backoff
-                if attempt < self.max_retries:
-                    time.sleep(2 ** attempt)
-
-        # Exhausted retries
+        # Iterate keys with per-key retries
+        for key in self.api_keys:
+            for attempt in range(1, self.max_retries + 1):
+                try:
+                    if self._new_genai:
+                        image_data_uri = self._call_new_genai(parts, key)
+                    else:
+                        image_data_uri = self._call_legacy_genai(parts, key)
+                    return image_data_uri
+                except Exception as e:  # noqa: BLE001
+                    last_error = e
+                    # If this looks like an invalid API key, try next key immediately
+                    msg = str(e).lower()
+                    if "api key not valid" in msg or "api_key_invalid" in msg or "invalid api key" in msg:
+                        break  # move to next key
+                    if attempt < self.max_retries:
+                        time.sleep(2 ** attempt)
+            # next key
+        # Exhausted keys / retries
         assert last_error is not None
         raise last_error
 
@@ -124,29 +143,43 @@ class GeminiImageService:
         parts.append({"text": self._prompt_text(clothing_pieces)})
         return parts
 
-    def _call_new_genai(self, parts: List[Dict[str, Any]]) -> Optional[str]:
+    def _call_new_genai(self, parts: List[Dict[str, Any]], key: str) -> Optional[str]:
         # New client: from google import genai
-        if not self._new_client:
-            self._new_client = self._new_genai.Client(api_key=self.api_key)  # type: ignore[attr-defined]
+        # Recreate client for the provided key to allow key fallback
+        self._new_client = self._new_genai.Client(api_key=key)  # type: ignore[attr-defined]
 
-        # The new API mirrors Node: models.generate_content
-        # Note: field names are snake_case in Python
+        # Convert any base64 strings to raw bytes for the new SDK
+        norm_parts: List[Dict[str, Any]] = []
+        for p in parts:
+            if "inline_data" in p and isinstance(p["inline_data"], dict):
+                mime = p["inline_data"].get("mime_type", "image/jpeg")
+                data = p["inline_data"].get("data")
+                if isinstance(data, str):
+                    try:
+                        data_bytes = base64.b64decode(data)
+                    except Exception:
+                        data_bytes = b""
+                else:
+                    data_bytes = data or b""
+                norm_parts.append({"inline_data": {"data": data_bytes, "mime_type": mime}})
+            else:
+                # text parts or others as-is
+                norm_parts.append(p)
+
+        # The new API mirrors Node but uses snake_case fields
         resp = self._new_client.models.generate_content(
             model=self.model,
-            contents={"parts": parts},
-            config={
-                "response_modalities": ["IMAGE", "TEXT"],
-            },
-            # request options are optional; timeout handled via retries/backoff
+            # Align to docs: wrap parts in a user Content object
+            contents=[{"role": "user", "parts": norm_parts}],
         )
 
         return self._extract_image_from_response(resp)
 
-    def _call_legacy_genai(self, parts: List[Dict[str, Any]]) -> Optional[str]:
+    def _call_legacy_genai(self, parts: List[Dict[str, Any]], key: str) -> Optional[str]:
         # Legacy client: import google.generativeai as genai
-        if not self._legacy_model:
-            self._legacy_genai.configure(api_key=self.api_key)  # type: ignore[attr-defined]
-            self._legacy_model = self._legacy_genai.GenerativeModel(self.model)  # type: ignore[attr-defined]
+        # Reconfigure model per key
+        self._legacy_genai.configure(api_key=key)  # type: ignore[attr-defined]
+        self._legacy_model = self._legacy_genai.GenerativeModel(self.model)  # type: ignore[attr-defined]
 
         # Convert to legacy-friendly inputs: list where inline_data -> dict with mime_type, data
         legacy_inputs: List[Any] = []
@@ -178,10 +211,15 @@ class GeminiImageService:
             for part in parts:
                 # New client returns dict-like objects with inline_data
                 inline = getattr(part, "inline_data", None) or part.get("inline_data")
-                if inline and (inline.get("data") or getattr(inline, "data", None)):
-                    data = inline.get("data") if isinstance(inline, dict) else getattr(inline, "data")
+                if inline and (getattr(inline, "data", None) or (isinstance(inline, dict) and inline.get("data"))):
+                    raw = inline.get("data") if isinstance(inline, dict) else getattr(inline, "data")
                     mime = inline.get("mime_type") if isinstance(inline, dict) else getattr(inline, "mime_type", "image/png")
-                    return f"data:{mime};base64,{data}"
+                    if isinstance(raw, (bytes, bytearray)):
+                        b64 = base64.b64encode(raw).decode("ascii")
+                    else:
+                        # assume already base64 string
+                        b64 = str(raw)
+                    return f"data:{mime};base64,{b64}"
             return None
         except Exception:
             return None
@@ -209,4 +247,3 @@ class GeminiImageService:
 
 
 gemini_image_service = GeminiImageService()
-
