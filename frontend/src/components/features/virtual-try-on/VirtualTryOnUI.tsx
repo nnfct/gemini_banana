@@ -6,7 +6,7 @@ import { RecommendationDisplay } from '../recommendations/RecommendationDisplay'
 import { Header } from '../layout/Header';
 import { virtualTryOnService } from '../../../services/virtualTryOn.service';
 import type { UploadedImage, ApiFile, ClothingItems, RecommendationOptions } from '../../../types';
-import { Card, Input, Button } from '../../ui';
+import { Card, Input } from '../../ui';
 
 export const VirtualTryOnUI: React.FC = () => {
     const [personImage, setPersonImage] = useState<UploadedImage | null>(null);
@@ -19,7 +19,7 @@ export const VirtualTryOnUI: React.FC = () => {
     const [isLoadingRecommendations, setIsLoadingRecommendations] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Simple filter options for recommendations
+    // Recommendation filter options
     const [minPrice, setMinPrice] = useState<string>('');
     const [maxPrice, setMaxPrice] = useState<string>('');
     const [excludeTagsInput, setExcludeTagsInput] = useState<string>('');
@@ -31,7 +31,7 @@ export const VirtualTryOnUI: React.FC = () => {
 
     const handleCombineClick = useCallback(async () => {
         if (!personImage || (!topImage && !pantsImage && !shoesImage)) {
-            setError('Please upload a person\'s image and at least one clothing item.');
+            setError("Please upload a person's image and at least one clothing item.");
             return;
         }
 
@@ -55,7 +55,7 @@ export const VirtualTryOnUI: React.FC = () => {
             if (result.generatedImage) {
                 setGeneratedImage(result.generatedImage);
 
-                // Get recommendations after virtual fitting
+                // Fetch recommendations after virtual fitting
                 setIsLoadingRecommendations(true);
                 try {
                     const options: RecommendationOptions = {};
@@ -73,7 +73,6 @@ export const VirtualTryOnUI: React.FC = () => {
                     setRecommendations(recommendationsResult.recommendations as any);
                 } catch (recError) {
                     console.error('Failed to get recommendations:', recError);
-                    // Show fitting result even if recommendations fail
                 } finally {
                     setIsLoadingRecommendations(false);
                 }
@@ -86,7 +85,7 @@ export const VirtualTryOnUI: React.FC = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [personImage, topImage, pantsImage, shoesImage]);
+    }, [personImage, topImage, pantsImage, shoesImage, minPrice, maxPrice, excludeTagsInput]);
 
     const canCombine = personImage && (topImage || pantsImage || shoesImage);
 
@@ -145,7 +144,7 @@ export const VirtualTryOnUI: React.FC = () => {
                                     <Input
                                         type="number"
                                         label="최소 가격"
-                                        placeholder="예: 10000"
+                                        placeholder="₩ 10000"
                                         value={minPrice}
                                         onChange={(e) => setMinPrice(e.target.value)}
                                         min={0}
@@ -153,13 +152,13 @@ export const VirtualTryOnUI: React.FC = () => {
                                     <Input
                                         type="number"
                                         label="최대 가격"
-                                        placeholder="예: 100000"
+                                        placeholder="₩ 100000"
                                         value={maxPrice}
                                         onChange={(e) => setMaxPrice(e.target.value)}
                                         min={0}
                                     />
                                     <Input
-                                        label="제외 태그(콤마구분)"
+                                        label="제외 태그(콤마 구분)"
                                         placeholder="예: formal, leather"
                                         value={excludeTagsInput}
                                         onChange={(e) => setExcludeTagsInput(e.target.value)}
@@ -177,15 +176,16 @@ export const VirtualTryOnUI: React.FC = () => {
                                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
                                     <div className="flex items-center justify-center">
                                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                                        <span className="ml-3 text-gray-600">Finding recommended products...</span>
+                                        <span className="ml-3 text-gray-600">추천 상품을 불러오는 중...</span>
                                     </div>
                                 </div>
                             ) : recommendations ? (
                                 <RecommendationDisplay
                                     recommendations={recommendations}
                                     onItemClick={(item) => {
-                                        console.log('Clicked item:', item);
-                                        // TODO: Add navigation to product detail page
+                                        if ((item as any).productUrl) {
+                                            window.open((item as any).productUrl as string, '_blank', 'noopener,noreferrer');
+                                        }
                                     }}
                                 />
                             ) : null}
@@ -196,3 +196,4 @@ export const VirtualTryOnUI: React.FC = () => {
         </div>
     );
 };
+
