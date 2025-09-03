@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card, Button } from '../../ui';
 import type { RecommendationItem } from '../../../types';
+import { apiClient } from '../../../services/api.service';
 
 function formatPriceKRW(n: number) {
   return new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(n);
@@ -14,8 +15,7 @@ const useRandomProducts = (limit: number = 18) => {
   const fetchItems = async () => {
     setLoading(true); setError(null);
     try {
-      const res = await fetch(`/api/recommend/random?limit=${limit}`);
-      const data = await res.json();
+      const data = await apiClient.get<RecommendationItem[]>(`/api/recommend/random?limit=${limit}`);
       setItems(data);
     } catch (e: any) {
       setError(e?.message || 'failed');
@@ -98,4 +98,3 @@ export const ECommerceUI: React.FC = () => {
     </div>
   );
 };
-

@@ -9,6 +9,7 @@ from ..models import (
 )
 from ..services.catalog import get_catalog_service
 from ..services.llm_ranker import llm_ranker
+from ..services.azure_openai_service import azure_openai_service
 
 
 router = APIRouter(prefix="/api/recommend", tags=["Recommendations"])
@@ -63,15 +64,23 @@ def random_products(limit: int = 18, category: str | None = None):
 
 @router.post("")
 def recommend_from_upload(req: RecommendationRequest) -> RecommendationResponse:
-    # Build analysis keywords from request (fallback style)
+    # Analyze style: prefer Azure OpenAI if available
     analysis = {}
-    # Minimal fallback keywords
-    if req.person:
-        analysis["overall_style"] = ["casual", "everyday"]
-    if req.clothingItems:
-        for k in ("top", "pants", "shoes"):
-            if getattr(req.clothingItems, k) is not None:
-                analysis.setdefault(k, []).extend([k, "basic", "casual"])
+    analysis_method = "fallback"
+    if azure_openai_service.available():
+        try:
+            analysis = azure_openai_service.analyze_style_from_images(req.person, req.clothingItems)
+            analysis_method = "ai"
+        except Exception:
+            analysis = {}
+            analysis_method = "fallback"
+    if not analysis:
+        if req.person:
+            analysis["overall_style"] = ["casual", "everyday"]
+        if req.clothingItems:
+            for k in ("top", "pants", "shoes"):
+                if getattr(req.clothingItems, k) is not None:
+                    analysis.setdefault(k, []).extend([k, "basic", "casual"])
 
     svc = get_catalog_service()
     opts = req.options or {}
@@ -122,7 +131,8 @@ def recommend_from_upload(req: RecommendationRequest) -> RecommendationResponse:
 
     return RecommendationResponse(
         recommendations=as_model,
-        analysisMethod="fallback",
+        analysisMethod=analysis_method,
+        styleAnalysis=analysis if analysis_method == "ai" else None,
         requestId=f"req_{int(datetime.utcnow().timestamp())}",
         timestamp=datetime.utcnow().isoformat() + "Z",
     )
@@ -130,8 +140,15 @@ def recommend_from_upload(req: RecommendationRequest) -> RecommendationResponse:
 
 @router.post("/from-fitting")
 def recommend_from_fitting(req: RecommendationFromFittingRequest) -> RecommendationResponse:
-    # For fitting, seed analysis with overall style + categories
+    # For fitting: prefer Azure analysis on generated image
+    analysis_method = "fallback"
     analysis = {"overall_style": ["casual", "relaxed"], "categories": ["top", "pants", "shoes"]}
+    if azure_openai_service.available() and req.generatedImage:
+        try:
+            analysis = azure_openai_service.analyze_virtual_try_on(req.generatedImage)
+            analysis_method = "ai"
+        except Exception:
+            analysis_method = "fallback"
     svc = get_catalog_service()
     opts = req.options or {}
     candidate_recs = svc.find_similar(
@@ -173,7 +190,8 @@ def recommend_from_fitting(req: RecommendationFromFittingRequest) -> Recommendat
 
     return RecommendationResponse(
         recommendations=as_model,
-        analysisMethod="fallback",
+        analysisMethod=analysis_method,
+        styleAnalysis=analysis if analysis_method == "ai" else None,
         requestId=f"req_{int(datetime.utcnow().timestamp())}",
         timestamp=datetime.utcnow().isoformat() + "Z",
     )

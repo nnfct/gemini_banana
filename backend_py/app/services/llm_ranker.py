@@ -4,7 +4,10 @@ import json
 import os
 from typing import Dict, List, Optional
 
-from openai import OpenAI
+try:
+    from openai import OpenAI  # type: ignore
+except Exception:
+    OpenAI = None  # type: ignore
 
 
 class LLMRanker:
@@ -17,7 +20,7 @@ class LLMRanker:
         self.temperature = float(os.getenv("LLM_RERANK_TEMPERATURE", "0.2"))
 
         self.client: Optional[OpenAI] = None
-        if self.endpoint and self.api_key:
+        if OpenAI is not None and self.endpoint and self.api_key:
             # Azure OpenAI compatible client
             self.client = OpenAI(
                 api_key=self.api_key,
@@ -89,4 +92,3 @@ class LLMRanker:
 
 
 llm_ranker = LLMRanker()
-
