@@ -76,3 +76,24 @@ npm run dev:py
 - 기능 개발은 기존 Node에서 빠르게 진행하고, FastAPI는 병행 검증합니다.
 - 개발자 경험: 어떤 스크립트를 실행하느냐만 바꾸면 됩니다.
 - 보안: 키는 백엔드 환경변수로만 관리(프론트 번들에 포함 안 됨).
+
+### Azure OpenAI 기반 추천 (고도화)
+
+FastAPI 추천 엔드포인트는 Azure OpenAI가 설정되어 있으면 자동으로 두 단계를 사용합니다.
+
+- 스타일 분석: 업로드 이미지(사람/의류) 또는 가상피팅 이미지에서 Azure OpenAI Vision 모델로 스타일/카테고리/색상을 추출합니다.
+- LLM 재정렬: 카탈로그에서 찾은 후보를 Azure OpenAI로 재정렬합니다. 명시적으로 끄지 않으면 기본 활성화됩니다.
+
+환경변수(.env 또는 실행 환경)
+
+```
+AZURE_OPENAI_ENDPOINT=<https://YOUR-RESOURCE.openai.azure.com>
+AZURE_OPENAI_KEY=<your-key>
+AZURE_OPENAI_DEPLOYMENT_ID=<gpt-4o or your deployment>
+AZURE_OPENAI_API_VERSION=2024-02-15-preview
+```
+
+요청 옵션으로 LLM 재정렬 제어하기
+
+- `options.useLLMRerank: true|false`  (생략 시, Azure OpenAI가 설정되어 있으면 기본 true)
+- `options.maxPerCategory`, `minPrice`, `maxPrice`, `excludeTags` 지원

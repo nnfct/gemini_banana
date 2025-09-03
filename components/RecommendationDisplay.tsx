@@ -7,6 +7,7 @@ interface RecommendationItem {
   imageUrl?: string;
   score?: number;
   category?: string;
+  productUrl?: string;
 }
 
 interface RecommendationDisplayProps {
@@ -47,7 +48,13 @@ const RecommendationDisplay: React.FC<RecommendationDisplayProps> = ({
             <div 
               key={item.id} 
               className="recommendation-item"
-              onClick={() => onItemClick?.(item)}
+              onClick={() => {
+                if (item.productUrl) {
+                  window.open(item.productUrl, '_blank', 'noopener,noreferrer');
+                } else {
+                  onItemClick?.(item);
+                }
+              }}
             >
               <div className="item-image-placeholder">
                 {item.imageUrl ? (

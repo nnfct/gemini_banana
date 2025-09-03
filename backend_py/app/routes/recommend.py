@@ -20,11 +20,14 @@ def status():
     stats = get_catalog_service().stats()
     return {
         "aiService": {
-            "available": True,
-            "config": {
-                "deploymentId": "gpt-4-vision-preview",
-                "timeout": 30000,
-                "isConfigured": True,
+            "azureOpenAI": {
+                "available": azure_openai_service.available(),
+                "deploymentId": getattr(azure_openai_service, "deployment_id", None),
+                "apiVersion": getattr(azure_openai_service, "api_version", None),
+            },
+            "llmReranker": {
+                "available": llm_ranker.available(),
+                "deploymentId": getattr(llm_ranker, "deployment_id", None),
             },
         },
         "catalogService": {
@@ -94,9 +97,10 @@ def recommend_from_upload(req: RecommendationRequest) -> RecommendationResponse:
         exclude_tags=getattr(opts, "excludeTags", None),
     )
 
-    # Optional LLM rerank
+    # Optional LLM rerank (default to Azure OpenAI when configured)
     max_k = (opts.maxPerCategory or 3) if hasattr(opts, "maxPerCategory") else 3
-    use_llm = getattr(opts, "useLLMRerank", False)
+    user_llm_pref = getattr(opts, "useLLMRerank", None)
+    use_llm = user_llm_pref if user_llm_pref is not None else llm_ranker.available()
     if use_llm and llm_ranker.available():
         ids = llm_ranker.rerank(analysis, candidate_recs, top_k=max_k)
         if ids:
@@ -161,7 +165,8 @@ def recommend_from_fitting(req: RecommendationFromFittingRequest) -> Recommendat
     )
 
     max_k = (opts.maxPerCategory or 3) if hasattr(opts, "maxPerCategory") else 3
-    use_llm = getattr(opts, "useLLMRerank", False)
+    user_llm_pref = getattr(opts, "useLLMRerank", None)
+    use_llm = user_llm_pref if user_llm_pref is not None else llm_ranker.available()
     if use_llm and llm_ranker.available():
         ids = llm_ranker.rerank(analysis, candidate_recs, top_k=max_k)
         if ids:

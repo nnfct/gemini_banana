@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from typing import Dict, List, Optional
+import httpx
 
 try:
     from openai import OpenAI  # type: ignore
@@ -20,17 +21,25 @@ class LLMRanker:
         self.temperature = float(os.getenv("LLM_RERANK_TEMPERATURE", "0.2"))
 
         self.client: Optional[OpenAI] = None
-        if OpenAI is not None and self.endpoint and self.api_key:
-            # Azure OpenAI compatible client
-            self.client = OpenAI(
-                api_key=self.api_key,
-                base_url=f"{self.endpoint}/openai/deployments/{self.deployment_id}",
-                default_query={"api-version": self.api_version},
-                default_headers={"api-key": self.api_key},
-            )
+        self._http_fallback: bool = False
+        if self.endpoint and self.api_key:
+            if OpenAI is not None:
+                try:
+                    # Azure OpenAI compatible client
+                    self.client = OpenAI(
+                        api_key=self.api_key,
+                        base_url=f"{self.endpoint}/openai/deployments/{self.deployment_id}",
+                        default_query={"api-version": self.api_version},
+                        default_headers={"api-key": self.api_key},
+                    )
+                except Exception:
+                    self.client = None
+                    self._http_fallback = True
+            else:
+                self._http_fallback = True
 
     def available(self) -> bool:
-        return self.client is not None
+        return (self.client is not None) or self._http_fallback
 
     def rerank(self, analysis: Dict, candidates: Dict[str, List[Dict]], top_k: int = 3) -> Optional[Dict[str, List[str]]]:
         """
@@ -71,13 +80,26 @@ class LLMRanker:
             content.append({"type": "text", "text": f"CANDIDATES_{cat.upper()}:\n{payload}"})
 
         try:
-            resp = self.client.chat.completions.create(
-                model=self.deployment_id,
-                messages=[{"role": "user", "content": content}],
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-            )
-            text = resp.choices[0].message.content or ""
+            if self.client is not None:
+                resp = self.client.chat.completions.create(
+                    model=self.deployment_id,
+                    messages=[{"role": "user", "content": content}],
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens,
+                )
+                text = resp.choices[0].message.content or ""
+            else:
+                # HTTP fallback to Azure Chat Completions
+                url = f"{self.endpoint}/openai/deployments/{self.deployment_id}/chat/completions"
+                params = {"api-version": self.api_version}
+                headers = {"api-key": self.api_key or "", "content-type": "application/json"}
+                payload = {"messages": [{"role": "user", "content": content}], "temperature": self.temperature, "max_tokens": self.max_tokens}
+                with httpx.Client(timeout=30.0) as client:
+                    r = client.post(url, params=params, headers=headers, json=payload)
+                    r.raise_for_status()
+                    data_http = r.json()
+                    text = (data_http.get("choices") or [{}])[0].get("message", {}).get("content", "")
+
             json_part = (text if text.strip().startswith("{") else (text.split("```json")[-1].split("```")[0] if "```" in text else text)).strip()
             data = json.loads(json_part)
             # normalize ids to strings

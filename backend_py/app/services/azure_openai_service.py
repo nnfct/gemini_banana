@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from typing import Dict, List, Optional
+import httpx
 
 try:
     from openai import OpenAI  # type: ignore
@@ -26,16 +27,27 @@ class AzureOpenAIService:
         self.max_tokens = int(os.getenv("AZURE_OPENAI_MAX_TOKENS", "500"))
 
         self.client: Optional[OpenAI] = None
-        if OpenAI is not None and self.endpoint and self.api_key:
-            self.client = OpenAI(
-                api_key=self.api_key,
-                base_url=f"{self.endpoint}/openai/deployments/{self.deployment_id}",
-                default_query={"api-version": self.api_version},
-                default_headers={"api-key": self.api_key},
-            )
+        self._http_fallback: bool = False
+        if self.endpoint and self.api_key:
+            if OpenAI is not None:
+                try:
+                    # Prefer SDK when available
+                    self.client = OpenAI(
+                        api_key=self.api_key,
+                        base_url=f"{self.endpoint}/openai/deployments/{self.deployment_id}",
+                        default_query={"api-version": self.api_version},
+                        default_headers={"api-key": self.api_key},
+                    )
+                except Exception:
+                    # If SDK import/runtime fails (e.g., missing binary deps on Windows), fall back to raw HTTP
+                    self.client = None
+                    self._http_fallback = True
+            else:
+                # No SDK -> use HTTP directly
+                self._http_fallback = True
 
     def available(self) -> bool:
-        return self.client is not None
+        return (self.client is not None) or self._http_fallback
 
     # ----------------------------- public API ----------------------------- #
     def analyze_style_from_images(self, person: Optional[Dict], clothing_items: Optional[Dict]) -> Dict:
@@ -79,13 +91,33 @@ class AzureOpenAIService:
 
     # --------------------------- internal helpers ------------------------ #
     def _chat_to_json(self, content: List[Dict]) -> Dict:
-        resp = self.client.chat.completions.create(
-            model=self.deployment_id,
-            messages=[{"role": "user", "content": content}],
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-        )
-        text = resp.choices[0].message.content or ""
+        if self.client is not None:
+            resp = self.client.chat.completions.create(
+                model=self.deployment_id,
+                messages=[{"role": "user", "content": content}],
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+            )
+            text = resp.choices[0].message.content or ""
+        else:
+            # HTTP fallback for Azure Chat Completions
+            url = f"{self.endpoint}/openai/deployments/{self.deployment_id}/chat/completions"
+            params = {"api-version": self.api_version}
+            headers = {
+                "api-key": self.api_key or "",
+                "content-type": "application/json",
+            }
+            payload = {
+                "messages": [{"role": "user", "content": content}],
+                "temperature": self.temperature,
+                "max_tokens": self.max_tokens,
+            }
+            with httpx.Client(timeout=30.0) as client:
+                r = client.post(url, params=params, headers=headers, json=payload)
+                r.raise_for_status()
+                data = r.json()
+                text = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
+
         json_str = self._extract_json(text)
         try:
             return json.loads(json_str)

@@ -29,6 +29,9 @@ class RecommendationOptions(BaseModel):
     minPrice: Optional[int] = Field(default=None, ge=0)
     maxPrice: Optional[int] = Field(default=None, ge=0)
     excludeTags: Optional[List[str]] = None
+    # When True, uses Azure OpenAI LLM to rerank candidate recommendations.
+    # When omitted (None), the backend will enable reranking by default if Azure OpenAI is configured.
+    useLLMRerank: Optional[bool] = None
 
 
 class RecommendationRequest(BaseModel):
@@ -51,6 +54,7 @@ class RecommendationItem(BaseModel):
     tags: List[str]
     category: str
     imageUrl: Optional[str] = None
+    productUrl: Optional[str] = None
     score: Optional[float] = None
 
 
@@ -67,4 +71,3 @@ class RecommendationResponse(BaseModel):
     styleAnalysis: Optional[Dict] = None
     requestId: Optional[str] = None
     timestamp: Optional[str] = None
-

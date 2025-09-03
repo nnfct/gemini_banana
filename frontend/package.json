@@ -6,6 +6,7 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
+        "dev:py": "cross-env VITE_API_URL=http://localhost:3001 vite",
         "build": "npm run build:clean && npm run build:prod",
         "build:clean": "node -e \"const fs = require('fs'); if (fs.existsSync('dist')) fs.rmSync('dist', {recursive: true});\"",
         "build:prod": "cross-env NODE_ENV=production vite build",
