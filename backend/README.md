@@ -40,7 +40,7 @@ Backend API server for the AI Virtual Try-On application, providing virtual try-
 
 3. **Environment setup**
    ```bash
-   cp .env.example .env
+   cp .env .env
    ```
 
 4. **Configure environment variables**

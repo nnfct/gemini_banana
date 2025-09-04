@@ -133,12 +133,12 @@ VITE_DEBUG=false
    ```bash
    # Backend
    cd backend
-   cp .env.example .env
+   cp .env .env
    # Edit .env with your API keys
    
    # Frontend
    cd ../frontend
-   cp .env.example .env
+   cp .env .env
    # Edit .env with backend URL
    ```
 

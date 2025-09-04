@@ -40,7 +40,7 @@ React-based frontend application for the AI Virtual Try-On system, providing an 
 
 3. **Environment setup**
    ```bash
-   cp .env.example .env
+   cp .env .env
    ```
 
 4. **Configure environment variables**
