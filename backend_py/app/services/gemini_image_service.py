@@ -116,10 +116,8 @@ class GeminiImageService:
     def _build_parts(self, person: Dict, clothing_items: Dict) -> List[Dict[str, Any]]:
         parts: List[Dict[str, Any]] = []
 
-        # Safety/consistency directives first
-        parts.append({
-            "text": self._safety_directives()
-        })
+        # Combine safety + task prompt up-front for stronger adherence
+        combined_text = self._safety_directives()
 
         # Person image
         parts.append({
@@ -144,8 +142,9 @@ class GeminiImageService:
         if not clothing_pieces:
             raise ValueError("At least one clothing item (top/pants/shoes) is required")
 
-        # Prompt text
-        parts.append({"text": self._prompt_text(clothing_pieces)})
+        # Add combined text (safety + task) as a single initial instruction
+        combined_text += "\n\nTASK:\n" + self._prompt_text(clothing_pieces)
+        parts.insert(0, {"text": combined_text})
         return parts
 
     def _call_new_genai(self, parts: List[Dict[str, Any]], key: str) -> Optional[str]:
@@ -249,7 +248,11 @@ class GeminiImageService:
             "- Preserve the EXACT facial identity. NO beautification, smoothing, makeup application, or landmark adjustments.",
             "- DO NOT CHANGE THE PERSON'S FACE SHAPE OR FACIAL STRUCTURE.",
             "- Maintain the background, perspective, and lighting IDENTICALLY to the original person image.",
-            "- Only composite the clothing from subsequent images onto the person realistically and seamlessly, ensuring the ENTIRE PERSON is visible.",
+            "- REPLACE existing garments with the provided clothing: top replaces top layer, pants replace pants, shoes replace shoes.",
+            "- Remove/ignore backgrounds from clothing product photos; segment garment only (no mannequin or logos).",
+            "- Fit garments to the person's pose with correct scale/rotation/warping; align perspective and seams.",
+            "- Respect occlusion: body parts (e.g., crossed arms/hands) naturally occlude garments when in front.",
+            "- Ensure the ENTIRE PERSON is visible; garments must cover appropriate regions (top on torso/arms, pants on legs to ankles, shoes on feet).",
             "- Do NOT add or remove accessories or objects. No text, logos, or watermarks.",
             "- Treat the face region as STRICTLY PIXEL-LOCKED: identity-specific details MUST remain unchanged and untouched.",
             "- If any instruction conflicts with another, the preservation of the person's facial identity and the integrity of the face shape are the ABSOLUTE HIGHEST PRIORITIES.",
@@ -259,12 +262,12 @@ class GeminiImageService:
     def _prompt_text(clothing_pieces: List[str]) -> str:
         items = ", ".join(clothing_pieces)
         return (
-            "Use the FIRST image as the absolute base for the person's face and body. Composite the clothing from the subsequent images onto the person as distinct layers. "
-            f"STRICTLY preserve the person's identity: face shape, all facial landmarks, exact expression, hairline, skin texture, body shape, and pose must remain IDENTICAL and UNCHANGED. "
-            f"Ensure the ENTIRE PERSON is visible in the output image. "
-            f"Output a single, photorealistic image of the SAME person wearing: {items}. "
-            "Ensure the clothing fit is natural, with correct perspective, occlusion, and shadows. If any conflict arises, ALWAYS prioritize preserving the person's identity and the integrity of the face shape over clothing fit or appearance. "
-            "Do not include any text, logos, or watermarks."
+            "Use the FIRST image as the base. Remove backgrounds from the clothing product photos and extract only the garments. "
+            "REPLACE the person's existing garments with the provided items: top -> torso/arms, pants -> legs to ankles, shoes -> feet. "
+            f"Output a single photorealistic image of the SAME person wearing: {items}. "
+            "Fit garments to the person's pose with correct scale/rotation/warping; match perspective and seam alignment. "
+            "Handle occlusion correctly (e.g., crossed arms remain in front of the top where appropriate). "
+            "Keep lighting and shadows consistent. Preserve the face and body shape exactly. No text, logos, or watermarks."
         )
 
 

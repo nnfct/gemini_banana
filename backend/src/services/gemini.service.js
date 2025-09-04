@@ -151,10 +151,14 @@ class GeminiService {
             "- Do NOT alter the person's face, hair, facial expression, skin texture, body shape, or pose.",
             '- Preserve the exact facial identity (no beautification, smoothing, makeup or landmark changes).',
             '- Keep background, perspective, and lighting IDENTICAL to the original person image.',
-            '- Only composite the clothing from the subsequent images onto the person realistically.',
+            '- REPLACE existing garments with the provided clothing: top replaces top layer, pants replace pants, shoes replace shoes.',
+            '- Remove/ignore backgrounds from clothing product photos; segment garment only (no mannequin or logos).',
+            '- Fit garments to the person\'s pose with correct scale/rotation/warping; align perspective and seams.',
+            '- Respect occlusion: body parts (e.g., crossed arms/hands) naturally occlude garments when in front.',
+            '- Ensure the ENTIRE PERSON is visible; garments cover appropriate regions (top on torso/arms, pants on legs to ankles, shoes on feet).',
             '- Do NOT add or remove accessories or objects. No text, logos, or watermarks.',
             "- Treat the face region as pixel-locked: identity-specific details MUST remain unchanged.",
-            "- If any instruction conflicts, ALWAYS preserve the person's identity over clothing fit.",
+            "- If any instruction conflicts, ALWAYS preserve the person\'s identity over clothing fit.",
         ].join('\n');
     }
 
@@ -169,7 +173,7 @@ class GeminiService {
             throw new Error('At least one clothing item is required');
         }
 
-        return `Use the FIRST image as the base. Composite the clothing from the subsequent images onto the person as layers. STRICTLY preserve the person: face shape, landmarks, expression, hairline, skin texture, body shape, and pose must remain IDENTICAL. Do not redraw or resynthesize the person. Output a single photorealistic image of the SAME person wearing: ${clothingPieces.join(', ')}. Ensure the clothing fits naturally (correct perspective, occlusion, and shadows). If there is any conflict, prefer preserving the person's identity over altering the person. Do not include text, logos, or watermarks.`;
+        return `Use the FIRST image as the base. Remove backgrounds from the clothing product photos and extract only the garments. REPLACE the existing garments with the provided items: top -> torso/arms, pants -> legs to ankles, shoes -> feet. Output a single photorealistic image of the SAME person wearing: ${clothingPieces.join(', ')}. Fit garments to the person\'s pose with correct scale/rotation/warping; match perspective and seam alignment. Handle occlusion correctly (e.g., crossed arms remain in front of the top where appropriate). Keep lighting/shadows consistent. Preserve the face and body shape exactly. No text, logos, or watermarks.`;
     }
 
     /**

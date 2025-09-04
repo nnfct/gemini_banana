@@ -61,7 +61,7 @@ export const generateVirtualTryOnImage = async (person: ApiFile, clothingItems: 
       clothingPieces.push('the shoes');
     }
 
-    const promptText = `Use the FIRST image as the base. Composite the clothing from the subsequent images onto the person as layers. STRICTLY preserve the person: face shape, landmarks, expression, hairline, skin texture, body shape, and pose must remain IDENTICAL. Do not redraw or resynthesize the person. Output a single photorealistic image of the SAME person wearing: ${clothingPieces.join(', ')}. Ensure the clothing fits naturally (correct perspective, occlusion, and shadows). If there is any conflict, prefer preserving the person's identity. Do not include text, logos, or watermarks.`;
+    const promptText = `Use the FIRST image as the base. Remove backgrounds from the clothing product photos and extract only the garments. REPLACE the existing garments with the provided items: top -> torso/arms, pants -> legs to ankles, shoes -> feet. Output a single photorealistic image of the SAME person wearing: ${clothingPieces.join(', ')}. Fit garments to the person's pose with correct scale/rotation/warping; match perspective and seam alignment. Handle occlusion correctly (e.g., crossed arms remain in front of the top where appropriate). Keep lighting/shadows consistent. Preserve the face and body shape exactly. No text, logos, or watermarks.`;
     
     parts.push({ text: promptText });
     
