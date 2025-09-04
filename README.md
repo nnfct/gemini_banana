@@ -4,20 +4,22 @@
 
 # Run and deploy your AI Studio app
 
+Note: Backend is now Python FastAPI (backend_py) only. Legacy Node backend was removed to avoid confusion.
+
 This contains everything you need to run your app locally.
 
 View your app in AI Studio: https://ai.studio/apps/drive/1ORGriwJMQVw1Sd-cSjddK7sGBrrm_B6D
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
+**Prerequisites:**  Node.js (frontend tooling) and Python 3.11+ (backend_py)
 
 
 1. Install dependencies:
    `npm install`
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+3. Run the app with Python backend:
+   `npm run dev:py`
 
 ---
 

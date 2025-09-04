@@ -1,8 +1,0 @@
-{
-    "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
-    "options": {
-        "provider": "auto",
-        "maxResults": 5,
-        "minSimilarity": 0.1
-    }
-}

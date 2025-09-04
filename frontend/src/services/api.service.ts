@@ -2,7 +2,7 @@ import { isRetryableError, getRetryDelay, createErrorContext, reportError } from
 
 // API Configuration
 const API_CONFIG = {
-    baseUrl: (import.meta.env.VITE_API_URL as string) || 'http://localhost:3000',
+    baseUrl: (import.meta.env.VITE_API_URL as string) || 'http://localhost:3001',
     timeout: 30000,
     retries: 3,
     retryDelay: 1000,
