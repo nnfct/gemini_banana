@@ -3,7 +3,8 @@ from __future__ import annotations
 import os
 import base64
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
+import io
 
 
 def _get_env(name: str, default: str | None = None) -> str:
@@ -120,10 +121,11 @@ class GeminiImageService:
         combined_text = self._safety_directives()
 
         # Person image
+        p_b64, p_mime = self._normalize_image(person.get("base64"), person.get("mimeType"))
         parts.append({
             "inline_data": {
-                "data": person["base64"],
-                "mime_type": person.get("mimeType", "image/jpeg"),
+                "data": p_b64,
+                "mime_type": p_mime,
             }
         })
 
@@ -131,10 +133,11 @@ class GeminiImageService:
         for key in ("top", "pants", "shoes"):
             item = clothing_items.get(key)
             if item and item.get("base64"):
+                b64, mime = self._normalize_image(item.get("base64"), item.get("mimeType"))
                 parts.append({
                     "inline_data": {
-                        "data": item["base64"],
-                        "mime_type": item.get("mimeType", "image/jpeg"),
+                        "data": b64,
+                        "mime_type": mime,
                     }
                 })
                 clothing_pieces.append(f"the {key}")
@@ -238,6 +241,51 @@ class GeminiImageService:
             return None
 
     # --------------------------- prompt helpers ------------------------------ #
+    @staticmethod
+    def _normalize_image(b64: Optional[str], mime: Optional[str]) -> Tuple[str, str]:
+        """Ensure image MIME is supported by Gemini; convert AVIF/HEIC to PNG.
+
+        Expects bare base64 (without data: prefix).
+        Returns tuple of (base64, mime).
+        """
+        if not b64:
+            raise ValueError("Image base64 is required")
+        m = (mime or "image/jpeg").lower()
+        supported = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+        if m in supported:
+            return b64, m
+
+        # Convert problematic formats
+        if m in {"image/avif", "image/heic", "image/heif"}:
+            from PIL import Image  # type: ignore
+            raw = base64.b64decode(b64)
+            # Try pillow-heif first (robust AVIF/HEIC decoder)
+            try:
+                import pillow_heif  # type: ignore
+                pillow_heif.register_heif_opener()
+                im = Image.open(io.BytesIO(raw))
+            except Exception:
+                # Fallback to pillow-avif-plugin if available
+                try:
+                    import pillow_avif  # type: ignore  # noqa: F401
+                    im = Image.open(io.BytesIO(raw))
+                except Exception as e:
+                    raise RuntimeError(
+                        "Unsupported MIME type {}. Install pillow-heif (preferred) or pillow-avif-plugin to enable conversion, or upload PNG/JPEG/WebP/GIF.".format(m)
+                    ) from e
+
+            # Normalize mode for PNG
+            if im.mode in ("P", "LA"):
+                im = im.convert("RGBA")
+            elif im.mode not in ("RGB", "RGBA"):
+                im = im.convert("RGB")
+            out = io.BytesIO()
+            im.save(out, format="PNG")
+            out_b64 = base64.b64encode(out.getvalue()).decode("ascii")
+            return out_b64, "image/png"
+
+        # Fallback: unknown type, keep data but relabel to jpeg to attempt best-effort
+        return b64, "image/jpeg"
     @staticmethod
     def _safety_directives() -> str:
         return "\n".join([
