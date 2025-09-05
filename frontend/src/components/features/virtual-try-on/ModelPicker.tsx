@@ -5,6 +5,7 @@ import { imageProxy } from '../../../services/imageProxy.service';
 
 interface ModelPickerProps {
   onPick: (img: UploadedImage) => void;
+  direction?: 'horizontal' | 'vertical';
 }
 
 const MODEL_FILES = [
@@ -32,7 +33,7 @@ function nameVariants(id: string): string[] {
   ];
 }
 
-export const ModelPicker: React.FC<ModelPickerProps> = ({ onPick }) => {
+export const ModelPicker: React.FC<ModelPickerProps> = ({ onPick, direction = 'horizontal' }) => {
   const candidates = useMemo(() => MODEL_FILES.map(m => {
     const names = nameVariants(m.id);
     const folders = ['models','model']; // support both public/models and public/model
@@ -86,11 +87,53 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({ onPick }) => {
     console.warn('Failed to load any model image', lastErr);
   };
 
+  const Title = (
+    <div className="flex items-center justify-between">
+      <h3 className="text-lg font-semibold text-gray-800">AI 모델 선택(상반신)</h3>
+      <span className="text-xs text-gray-500">frontend/public/models 에 이미지 배치</span>
+    </div>
+  );
+
+  if (direction === 'vertical') {
+    return (
+      <Card className="space-y-3">
+        <div className="flex items-start justify-between">
+          <div>
+            <h3 className="text-base font-bold text-gray-800 leading-tight">AI 모델</h3>
+            <p className="text-xs text-gray-500">선택(상반신)</p>
+          </div>
+          <span className="text-[10px] text-gray-400">public/models</span>
+        </div>
+        <div className="flex flex-col gap-3 max-h-[520px] overflow-y-auto pr-1">
+          {candidates.map(m => (
+            <div key={m.id} className="w-full">
+              <div className="aspect-[3/4] rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
+                {previewMap[m.id] ? (
+                  <img src={previewMap[m.id]} alt={m.label} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">이미지 없음</div>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-gray-700 truncate text-center">{m.label}</p>
+              <div className="mt-1 text-center">
+                <Button size="sm" onClick={() => handlePick(m.urls, m.id, m.id)}>사용</Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    );
+  }
+
+  // horizontal (default)
   return (
     <Card className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-800">AI 모델 선택(상반신)</h3>
-        <span className="text-xs text-gray-500">frontend/public/models 에 이미지 배치</span>
+      <div className="flex items-start justify-between">
+        <div>
+          <h3 className="text-base font-bold text-gray-800 leading-tight">AI 모델</h3>
+          <p className="text-xs text-gray-500">선택(상반신)</p>
+        </div>
+        <span className="text-[10px] text-gray-400">public/models</span>
       </div>
       <div className="overflow-x-auto whitespace-nowrap flex gap-4 pb-1">
         {candidates.map(m => (

@@ -117,8 +117,7 @@ class GeminiImageService:
     def _build_parts(self, person: Dict, clothing_items: Dict) -> List[Dict[str, Any]]:
         parts: List[Dict[str, Any]] = []
 
-        # Combine safety + task prompt up-front for stronger adherence
-        combined_text = self._safety_directives()
+        # Build a single consolidated instruction block (safety + task)
 
         # Person image
         p_b64, p_mime = self._normalize_image(person.get("base64"), person.get("mimeType"))
@@ -145,9 +144,9 @@ class GeminiImageService:
         if not clothing_pieces:
             raise ValueError("At least one clothing item (top/pants/shoes) is required")
 
-        # Add combined text (safety + task) as a single initial instruction
-        combined_text += "\n\nTASK:\n" + self._prompt_text(clothing_pieces)
-        parts.insert(0, {"text": combined_text})
+        # Add consolidated text (safety + task) as a single initial instruction
+        consolidated_text = self._build_prompt(clothing_pieces)
+        parts.insert(0, {"text": consolidated_text})
         return parts
 
     def _call_new_genai(self, parts: List[Dict[str, Any]], key: str) -> Optional[str]:
@@ -307,16 +306,36 @@ class GeminiImageService:
         ])
 
     @staticmethod
-    def _prompt_text(clothing_pieces: List[str]) -> str:
+    def _build_prompt(clothing_pieces: List[str]) -> str:
+        """Single consolidated prompt used for generation (safety + task)."""
+        safety = "\n".join([
+            "CRITICAL SAFETY AND CONSISTENCY DIRECTIVES:",
+            "- The FIRST image MUST be used as the base and definitive source for the person's identity and appearance.",
+            "- FACE PIXEL LOCK: The face region from the FIRST image must be preserved PIXEL-FOR-PIXEL with ZERO changes.",
+            "- Absolutely NO re-synthesis, redraw, retouch, beautification, color shift, smoothing, makeup, or landmark/shape adjustments to the face.",
+            "- Preserve facial structure, landmarks, skin texture, pores, moles, scars, facial hair (if any), hairline, eye shape, nose shape, mouth shape, expression, skin tone, and lighting EXACTLY.",
+            "- Do NOT crop out the head; keep the full head visible as in the FIRST image.",
+            "- Clothing product photos may contain people or mannequins. IGNORE any person/skin/face/limbs from clothing photos; extract GARMENTS ONLY.",
+            "- Remove backgrounds from clothing photos; segment garments only (no mannequin, no body parts, no logos, no watermarks).",
+            "- Replace existing garments with the provided ones: top replaces top layer, pants replace pants, shoes replace shoes.",
+            "- Fit garments to the person's pose with correct scale/rotation/warping; align perspective and seams; respect occlusion (hands/arms in front remain in front).",
+            "- Maintain the original background, camera perspective, body shape, and scene lighting from the FIRST image.",
+            "- Do NOT add or remove accessories or objects. No text, no extra graphics.",
+            "- If any instruction conflicts with another, preserving the face from the FIRST image is the HIGHEST PRIORITY and MUST NOT be violated.",
+            "- If preserving the face is not possible, return the same face unmodified and only change the garments.",
+        ])
+
         items = ", ".join(clothing_pieces)
-        return (
-            "Use the FIRST image as the base. Remove backgrounds from the clothing product photos and extract only the garments. "
-            "REPLACE the person's existing garments with the provided items: top -> torso/arms, pants -> legs to ankles, shoes -> feet. "
+        task = (
+            "TASK:\n"
+            "Use the FIRST image as the base. Remove backgrounds from the clothing product photos and extract ONLY the garments (no model body). "
+            "Replace the person's garments with the provided items: top→torso/arms, pants→legs to ankles, shoes→feet. "
             f"Output a single photorealistic image of the SAME person wearing: {items}. "
-            "Fit garments to the person's pose with correct scale/rotation/warping; match perspective and seam alignment. "
+            "Fit garments to the person's pose with correct scale/rotation/warping; match perspective and seam alignment; preserve wrinkles and natural shading. "
             "Handle occlusion correctly (e.g., crossed arms remain in front of the top where appropriate). "
-            "Keep lighting and shadows consistent. Preserve the face and body shape exactly. No text, logos, or watermarks."
+            "Keep lighting and shadows consistent. Preserve the face and body shape EXACTLY as in the FIRST image. Do not alter the face. No text, logos, or watermarks."
         )
+        return f"{safety}\n\n{task}"
 
 
 gemini_image_service = GeminiImageService()

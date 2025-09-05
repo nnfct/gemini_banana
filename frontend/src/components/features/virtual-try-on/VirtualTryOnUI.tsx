@@ -10,12 +10,18 @@ import { Card, Input, Button, useToast, toast } from '../../ui';
 import { likesService } from '../../../services/likes.service';
 import { imageProxy } from '../../../services/imageProxy.service';
 import { ModelPicker } from './ModelPicker';
+import { tryOnHistory } from '../../../services/tryon_history.service';
+import { TryOnHistory } from './TryOnHistory';
 
 export const VirtualTryOnUI: React.FC = () => {
     const [personImage, setPersonImage] = useState<UploadedImage | null>(null);
     const [topImage, setTopImage] = useState<UploadedImage | null>(null);
     const [pantsImage, setPantsImage] = useState<UploadedImage | null>(null);
     const [shoesImage, setShoesImage] = useState<UploadedImage | null>(null);
+    const [personSource, setPersonSource] = useState<'model' | 'upload' | 'unknown'>('unknown');
+    const [topLabel, setTopLabel] = useState<string | undefined>(undefined);
+    const [pantsLabel, setPantsLabel] = useState<string | undefined>(undefined);
+    const [shoesLabel, setShoesLabel] = useState<string | undefined>(undefined);
     const [generatedImage, setGeneratedImage] = useState<string | null>(null);
     const [recommendations, setRecommendations] = useState<any>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -43,6 +49,30 @@ export const VirtualTryOnUI: React.FC = () => {
         mimeType: uploadedImage.mimeType,
     });
 
+    // helpers for history
+    const toDataUrl = (img: UploadedImage | null | undefined) => img ? `data:${img.mimeType};base64,${img.base64}` : undefined;
+    // mode: 'delta' logs only provided overrides; 'snapshot' logs full current state
+    const recordInput = (
+        overrides?: Partial<{ person: UploadedImage | null; top: UploadedImage | null; pants: UploadedImage | null; shoes: UploadedImage | null; }>,
+        labels?: Partial<{ top: string; pants: string; shoes: string }>,
+        mode: 'delta' | 'snapshot' = 'delta',
+    ) => {
+        const p = mode === 'delta' ? (overrides?.person ?? null) : (overrides && 'person' in overrides ? overrides.person : personImage);
+        const t = mode === 'delta' ? (overrides?.top ?? null) : (overrides && 'top' in overrides ? overrides.top : topImage);
+        const pa = mode === 'delta' ? (overrides?.pants ?? null) : (overrides && 'pants' in overrides ? overrides.pants : pantsImage);
+        const s = mode === 'delta' ? (overrides?.shoes ?? null) : (overrides && 'shoes' in overrides ? overrides.shoes : shoesImage);
+        tryOnHistory.addInput({
+            person: personSource,
+            topLabel: labels?.top ?? (mode === 'delta' ? undefined : topLabel),
+            pantsLabel: labels?.pants ?? (mode === 'delta' ? undefined : pantsLabel),
+            shoesLabel: labels?.shoes ?? (mode === 'delta' ? undefined : shoesLabel),
+            personImage: toDataUrl(p || null),
+            topImage: toDataUrl(t || null),
+            pantsImage: toDataUrl(pa || null),
+            shoesImage: toDataUrl(s || null),
+        });
+    };
+
     const handleCombineClick = useCallback(async () => {
         if (!personImage || (!topImage && !pantsImage && !shoesImage)) {
             setError("Please upload a person's image and at least one clothing item.");
@@ -61,6 +91,19 @@ export const VirtualTryOnUI: React.FC = () => {
                 shoes: shoesImage ? convertToApiFile(shoesImage) : null,
             };
 
+            // Record input history with small previews (data URLs)
+            const toDataUrl = (img: UploadedImage | null | undefined) => img ? `data:${img.mimeType};base64,${img.base64}` : undefined;
+            tryOnHistory.addInput({
+                person: personSource,
+                topLabel,
+                pantsLabel,
+                shoesLabel,
+                personImage: toDataUrl(personImage),
+                topImage: toDataUrl(topImage),
+                pantsImage: toDataUrl(pantsImage),
+                shoesImage: toDataUrl(shoesImage),
+            });
+
             const result = await virtualTryOnService.combineImages({
                 person: convertToApiFile(personImage),
                 clothingItems,
@@ -68,6 +111,8 @@ export const VirtualTryOnUI: React.FC = () => {
 
             if (result.generatedImage) {
                 setGeneratedImage(result.generatedImage);
+                // Record output history (data URI)
+                tryOnHistory.addOutput(result.generatedImage);
 
                 // Fetch recommendations after virtual fitting
                 setIsLoadingRecommendations(true);
@@ -116,35 +161,40 @@ export const VirtualTryOnUI: React.FC = () => {
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                         {/* Input Section */}
                         <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                <ImageUploader
-                                    id="person-image"
-                                    title="Person"
-                                    description="Upload a full-body photo."
-                                    onImageUpload={setPersonImage}
-                                    externalImage={personImage}
-                                />
-                                <ImageUploader
-                                    id="top-image"
-                                    title="Top"
-                                    description="Upload a photo of a top."
-                                    onImageUpload={setTopImage}
-                                    externalImage={topImage}
-                                />
-                                <ImageUploader
-                                    id="pants-image"
-                                    title="Pants"
-                                    description="Upload a photo of pants."
-                                    onImageUpload={setPantsImage}
-                                    externalImage={pantsImage}
-                                />
-                                <ImageUploader
-                                    id="shoes-image"
-                                    title="Shoes"
-                                    description="Upload a photo of shoes."
-                                    onImageUpload={setShoesImage}
-                                    externalImage={shoesImage}
-                                />
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="md:col-span-1">
+                                    <ModelPicker direction="vertical" onPick={(img) => { setPersonImage(img); setPersonSource('model'); recordInput({ person: img }, undefined, 'delta'); }} />
+                                </div>
+                                <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    <ImageUploader
+                                        id="person-image"
+                                        title="Person"
+                                        description="Upload a full-body photo."
+                                        onImageUpload={(img) => { setPersonImage(img); setPersonSource(img ? 'upload' : 'unknown'); recordInput({ person: img }, undefined, 'delta'); }}
+                                        externalImage={personImage}
+                                    />
+                                    <ImageUploader
+                                        id="top-image"
+                                        title="Top"
+                                        description="Upload a photo of a top."
+                                        onImageUpload={(img) => { setTopImage(img); setTopLabel(img ? '업로드' : undefined); recordInput({ top: img }, { top: img ? '업로드' : undefined }, 'delta'); }}
+                                        externalImage={topImage}
+                                    />
+                                    <ImageUploader
+                                        id="pants-image"
+                                        title="Pants"
+                                        description="Upload a photo of pants."
+                                        onImageUpload={(img) => { setPantsImage(img); setPantsLabel(img ? '업로드' : undefined); recordInput({ pants: img }, { pants: img ? '업로드' : undefined }, 'delta'); }}
+                                        externalImage={pantsImage}
+                                    />
+                                    <ImageUploader
+                                        id="shoes-image"
+                                        title="Shoes"
+                                        description="Upload a photo of shoes."
+                                        onImageUpload={(img) => { setShoesImage(img); setShoesLabel(img ? '업로드' : undefined); recordInput({ shoes: img }, { shoes: img ? '업로드' : undefined }, 'delta'); }}
+                                        externalImage={shoesImage}
+                                    />
+                                </div>
                             </div>
                         </div>
 
@@ -160,8 +210,38 @@ export const VirtualTryOnUI: React.FC = () => {
                                 isLoading={isLoading}
                                 error={error}
                             />
-                            {/* Preset upper-body models to quickly fill person slot */}
-                            <ModelPicker onPick={(img) => setPersonImage(img)} />
+                            <TryOnHistory onApply={(payload) => {
+                                const parse = (data?: string, title?: string): UploadedImage | null => {
+                                    if (!data) return null;
+                                    const m = data.match(/^data:([^;]+);base64,(.*)$/);
+                                    if (!m) return null;
+                                    const mimeType = m[1];
+                                    const base64 = m[2];
+                                    // Construct a File from base64 for consistency
+                                    try {
+                                        const byteChars = atob(base64);
+                                        const byteNumbers = new Array(byteChars.length);
+                                        for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+                                        const byteArray = new Uint8Array(byteNumbers);
+                                        const blob = new Blob([byteArray], { type: mimeType });
+                                        const ext = mimeType.split('/')[1] || 'png';
+                                        const file = new File([blob], `${title || 'history'}.${ext}`, { type: mimeType });
+                                        return { file, previewUrl: data, base64, mimeType };
+                                    } catch {
+                                        return { file: new File([], title || 'history', { type: mimeType }), previewUrl: data, base64, mimeType } as UploadedImage;
+                                    }
+                                };
+                                const p = parse(payload.person, 'person');
+                                const t = parse(payload.top, payload.topLabel || 'top');
+                                const pa = parse(payload.pants, payload.pantsLabel || 'pants');
+                                const s = parse(payload.shoes, payload.shoesLabel || 'shoes');
+                                if (p) { setPersonImage(p); setPersonSource('upload'); }
+                                if (t) { setTopImage(t); setTopLabel(payload.topLabel || '히스토리'); }
+                                if (pa) { setPantsImage(pa); setPantsLabel(payload.pantsLabel || '히스토리'); }
+                                if (s) { setShoesImage(s); setShoesLabel(payload.shoesLabel || '히스토리'); }
+                                addToast(toast.success('히스토리에서 적용했습니다', undefined, { duration: 1200 }));
+                            }} />
+                            {/* ModelPicker moved to left sidebar in input section */}
                             {likedItems.length > 0 && (
                                 <Card className="space-y-3">
                                     <h3 className="text-lg font-semibold text-gray-800">좋아요에서 빠르게 담기</h3>
@@ -181,9 +261,9 @@ export const VirtualTryOnUI: React.FC = () => {
                                                 }
                                                 try {
                                                     const up = await imageProxy.toUploadedImage(item.imageUrl, item.title);
-                                                    if (slot === 'top') setTopImage(up);
-                                                    if (slot === 'pants') setPantsImage(up);
-                                                    if (slot === 'shoes') setShoesImage(up);
+                                                    if (slot === 'top') { setTopImage(up); setTopLabel(item.title); recordInput({ top: up }, { top: item.title }, 'delta'); }
+                                                    if (slot === 'pants') { setPantsImage(up); setPantsLabel(item.title); recordInput({ pants: up }, { pants: item.title }, 'delta'); }
+                                                    if (slot === 'shoes') { setShoesImage(up); setShoesLabel(item.title); recordInput({ shoes: up }, { shoes: item.title }, 'delta'); }
                                                     addToast(toast.success('피팅에 담겼습니다', `${item.title} → ${slot}`, { duration: 2000 }));
                                                     if (personImage) {
                                                         setTimeout(() => { (async () => { await combineNow(); })(); }, 0);
@@ -210,6 +290,7 @@ export const VirtualTryOnUI: React.FC = () => {
                                 </Card>
                             )}
                             {/* Recommendation Filters */}
+                            {false && (
                             <Card className="space-y-4">
                                 <h3 className="text-lg font-semibold text-gray-800">추천 필터</h3>
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -238,6 +319,7 @@ export const VirtualTryOnUI: React.FC = () => {
                                 </div>
                                 <p className="text-xs text-gray-500">필터는 가상 피팅 이후 추천 호출에 자동 적용됩니다.</p>
                             </Card>
+                            )}
                         </div>
                     </div>
 
