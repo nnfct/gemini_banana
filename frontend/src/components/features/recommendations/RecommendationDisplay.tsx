@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Card } from '../../ui';
+import { Card, Button, useToast, toast } from '../../ui';
 import type { RecommendationItem, CategoryRecommendations } from '../../../types';
+import { likesService } from '../../../services/likes.service';
+import { HeartIcon } from '../../icons/HeartIcon';
 
 interface RecommendationDisplayProps {
     recommendations: CategoryRecommendations;
@@ -28,7 +30,7 @@ export const RecommendationDisplay: React.FC<RecommendationDisplayProps> = ({
     };
 
     // pagination state and helper for refresh
-    const [page, setPage] = useState(0);
+    const [page] = useState(0);
     const visiblePerCategory = 3;
 
     const getPagedItems = (items: RecommendationItem[]) => {
@@ -36,6 +38,88 @@ export const RecommendationDisplay: React.FC<RecommendationDisplayProps> = ({
         const start = (page * visiblePerCategory) % items.length;
         const end = start + visiblePerCategory;
         return end <= items.length ? items.slice(start, end) : [...items.slice(start), ...items.slice(0, end - items.length)];
+    };
+
+    const ItemCard: React.FC<{ item: RecommendationItem }> = ({ item }) => {
+        const { addToast } = useToast();
+        const [liked, setLiked] = useState<boolean>(() => likesService.isLiked(item.id));
+
+        const onToggleLike: React.MouseEventHandler = (e) => {
+            e.preventDefault(); e.stopPropagation();
+            const nowLiked = likesService.toggle(item);
+            setLiked(nowLiked);
+            addToast(
+                nowLiked
+                    ? toast.success('좋아요에 추가', item.title, { duration: 2000 })
+                    : toast.info('좋아요에서 제거', item.title, { duration: 1500 })
+            );
+        };
+
+        const onBuy: React.MouseEventHandler = (e) => {
+            e.preventDefault(); e.stopPropagation();
+            if ((item as any).productUrl) {
+                window.open((item as any).productUrl as string, '_blank', 'noopener,noreferrer');
+            }
+        };
+
+        const body = (
+            <Card className="cursor-pointer hover:shadow-lg transition-shadow duration-200">
+                <div className="aspect-square bg-gray-100 rounded-lg mb-3 overflow-hidden">
+                    {item.imageUrl ? (
+                        <img
+                            src={item.imageUrl}
+                            alt={item.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                                const img = e.currentTarget as HTMLImageElement;
+                                if (img.src !== fallbackImage) {
+                                    img.src = fallbackImage;
+                                }
+                            }}
+                        />
+                    ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
+                            No Image
+                        </div>
+                    )}
+                </div>
+                <div className="space-y-1">
+                    <p className="font-medium text-sm text-gray-900 line-clamp-2">{item.title}</p>
+                    <p className="font-semibold text-primary-600">{formatPrice(item.price)}</p>
+                    {item.score !== undefined && (
+                        <p className="text-xs text-gray-500">점수 {item.score}</p>
+                    )}
+                    <div className="pt-2 flex gap-2">
+                        <Button size="sm" onClick={onBuy} disabled={!(item as any).productUrl}>구매</Button>
+                        <Button size="sm" variant={liked ? 'secondary' : 'outline'} onClick={onToggleLike} aria-pressed={liked}>
+                            <span className="inline-flex items-center gap-1">
+                                <HeartIcon className={liked ? 'w-4 h-4 text-red-500' : 'w-4 h-4'} />
+                                {liked ? '좋아요됨' : '좋아요'}
+                            </span>
+                        </Button>
+                    </div>
+                </div>
+            </Card>
+        );
+
+        const url = (item as any).productUrl as string | undefined;
+        return url ? (
+            <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block"
+            >
+                {body}
+            </a>
+        ) : (
+            <div
+                onClick={() => onItemClick?.(item)}
+                className="block"
+            >
+                {body}
+            </div>
+        );
     };
 
     const renderCategory = (categoryName: string, items: RecommendationItem[]) => {
@@ -54,63 +138,9 @@ export const RecommendationDisplay: React.FC<RecommendationDisplayProps> = ({
                     {categoryNames[categoryName] || categoryName}
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {getPagedItems(items).map((item) => {
-                        const body = (
-                            <Card
-                                key={item.id}
-                                className="cursor-pointer hover:shadow-lg transition-shadow duration-200"
-                            >
-                                <div className="aspect-square bg-gray-100 rounded-lg mb-3 overflow-hidden">
-                                    {item.imageUrl ? (
-                                        <img
-                                            src={item.imageUrl}
-                                            alt={item.title}
-                                            className="w-full h-full object-cover"
-                                            onError={(e) => {
-                                                const img = e.currentTarget as HTMLImageElement;
-                                                if (img.src !== fallbackImage) {
-                                                    img.src = fallbackImage;
-                                                }
-                                            }}
-                                        />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
-                                            No Image
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="font-medium text-sm text-gray-900 line-clamp-2">{item.title}</p>
-                                    <p className="font-semibold text-primary-600">{formatPrice(item.price)}</p>
-                                    {item.score !== undefined && (
-                                        <p className="text-xs text-gray-500">유사도 {item.score}</p>
-                                    )}
-                                </div>
-                            </Card>
-                        );
-
-                        // If productUrl exists, render as an anchor to ensure navigation always works
-                        const url = (item as any).productUrl as string | undefined;
-                        return url ? (
-                            <a
-                                key={item.id}
-                                href={url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="block"
-                            >
-                                {body}
-                            </a>
-                        ) : (
-                            <div
-                                key={item.id}
-                                onClick={() => onItemClick?.(item)}
-                                className="block"
-                            >
-                                {body}
-                            </div>
-                        );
-                    })}
+                    {getPagedItems(items).map((item) => (
+                        <ItemCard key={item.id} item={item} />
+                    ))}
                 </div>
             </div>
         );
@@ -143,3 +173,4 @@ export const RecommendationDisplay: React.FC<RecommendationDisplayProps> = ({
 };
 
 export default RecommendationDisplay;
+

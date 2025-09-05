@@ -6,6 +6,7 @@ from .routes.health import router as health_router
 from .routes.api import router as api_router
 from .routes.generate import router as generate_router
 from .routes.recommend import router as recommend_router
+from .routes.proxy import router as proxy_router
 
 
 app = FastAPI(title="AI Virtual Try-On API (Python)")
@@ -24,6 +25,7 @@ app.include_router(health_router)
 app.include_router(api_router)
 app.include_router(generate_router)
 app.include_router(recommend_router)
+app.include_router(proxy_router)
 
 
 @app.get("/")
@@ -40,4 +42,3 @@ if __name__ == "__main__":
         port=settings.PORT,
         reload=settings.NODE_ENV != "production",
     )
-

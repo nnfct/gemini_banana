@@ -11,11 +11,11 @@ interface BottomNavProps {
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({ activePage, setPage }) => {
-    const navItems = [
+    const navItems: Array<{ id: string; label: string; icon: React.FC<any>; page: string | null; }>= [
         { id: 'category', label: '카테고리', icon: CategoryIcon, page: null },
         { id: 'try-on', label: '사이버피팅', icon: ShirtIcon, page: 'try-on' },
         { id: 'home', label: '무신사 홈', icon: HomeIcon, page: 'home' },
-        { id: 'likes', label: '좋아요', icon: HeartIcon, page: null },
+        { id: 'likes', label: '좋아요', icon: HeartIcon, page: 'likes' },
         { id: 'my', label: '마이', icon: UserIcon, page: null },
     ];
 
@@ -30,8 +30,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activePage, setPage }) => 
                             onClick={() => item.page && setPage(item.page)}
                             disabled={!item.page}
                             aria-label={item.label}
-                            className={`flex flex-col items-center justify-center gap-1 text-xs w-1/5 pt-2 pb-1 transition-colors duration-200 focus:outline-none ${isActive ? 'text-black font-bold' : 'text-gray-500 font-medium'
-                                } ${!item.page ? 'cursor-not-allowed opacity-60' : 'hover:text-black'}`}
+                            className={`flex flex-col items-center justify-center gap-1 text-xs w-1/5 pt-2 pb-1 transition-colors duration-200 focus:outline-none ${isActive ? 'text-black font-bold' : 'text-gray-500 font-medium'} ${!item.page ? 'cursor-not-allowed opacity-60' : 'hover:text-black'}`}
                         >
                             <item.icon className="w-6 h-6 mb-0.5" aria-hidden="true" />
                             <span>{item.label}</span>
@@ -42,3 +41,4 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activePage, setPage }) => 
         </footer>
     );
 };
+

@@ -8,16 +8,35 @@ interface ImageUploaderProps {
     title: string;
     description: string;
     onImageUpload: (image: UploadedImage | null) => void;
+    externalImage?: UploadedImage | null;
 }
 
 export const ImageUploader: React.FC<ImageUploaderProps> = ({
     id,
     title,
     description,
-    onImageUpload
+    onImageUpload,
+    externalImage
 }) => {
     const [preview, setPreview] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Sync preview when externalImage is provided/changed
+    React.useEffect(() => {
+        if (!externalImage) { setPreview(null); return; }
+        // Prefer generating a fresh data URL from File for max compatibility
+        if (externalImage.file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const result = String(reader.result || '');
+                setPreview(result);
+            };
+            reader.readAsDataURL(externalImage.file);
+        } else {
+            const url = `data:${externalImage.mimeType};base64,${externalImage.base64}`;
+            setPreview(url);
+        }
+    }, [externalImage]);
 
     const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -84,7 +103,21 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             >
                 {preview ? (
                     <>
-                        <img src={preview} alt={title} className="w-full h-full object-cover rounded-lg" />
+                        <img
+                            key={preview}
+                            src={preview}
+                            alt={title}
+                            className="w-full h-full object-cover rounded-lg"
+                            onError={(e) => {
+                                // Fallback to data URL if external preview path fails
+                                if (externalImage?.base64 && externalImage?.mimeType) {
+                                    const fallback = `data:${externalImage.mimeType};base64,${externalImage.base64}`;
+                                    if ((e.currentTarget as HTMLImageElement).src !== fallback) {
+                                        (e.currentTarget as HTMLImageElement).src = fallback;
+                                    }
+                                }
+                            }}
+                        />
                         <button
                             onClick={handleRemoveImage}
                             className="absolute top-2 right-2 p-1 bg-white/70 rounded-full text-gray-600 hover:bg-white hover:text-red-500 transition-all duration-200"
