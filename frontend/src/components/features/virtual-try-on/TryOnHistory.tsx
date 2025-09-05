@@ -47,40 +47,28 @@ export const TryOnHistory: React.FC<TryOnHistoryProps> = ({ onApply }) => {
             <Button size="sm" variant="ghost" onClick={() => { tryOnHistory.clearInputs(); refresh(); }}>비우기</Button>
           </div>
         </div>
-        <ul className="divide-y divide-gray-200">
+        <div className="grid grid-cols-2 gap-3">
           {inputs.length === 0 ? (
-            <li className="py-4 text-sm text-gray-500">기록이 없습니다.</li>
+            <div className="col-span-2 py-4 text-sm text-gray-500 text-center">기록이 없습니다.</div>
           ) : inputs.map(item => {
             const first = item.personImage || item.topImage || item.pantsImage || item.shoesImage;
             return (
-              <li key={item.id} className="py-3 text-sm">
-                <button type="button" onClick={() => onApply?.({ person: item.personImage, top: item.topImage, pants: item.pantsImage, shoes: item.shoesImage, topLabel: item.topLabel, pantsLabel: item.pantsLabel, shoesLabel: item.shoesLabel })} className="w-full text-left">
-                <div className="flex items-center gap-3">
-                  <div className="w-14 aspect-[4/5] rounded-md overflow-hidden bg-gray-100 flex-shrink-0">
-                    {first ? (
-                      <img src={first} alt="input" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">-</div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <div className="font-medium text-gray-900 truncate">입력</div>
-                      <div className="text-xs text-gray-500 ml-2 flex-shrink-0">{fmt(item.ts)}</div>
-                    </div>
-                    <div className="mt-1 text-gray-700 truncate">
-                      <span className="inline-block mr-2 text-xs rounded-full bg-gray-100 px-2 py-0.5">person: {item.person}</span>
-                      {item.topLabel && <span className="inline-block mr-2 text-xs rounded-full bg-gray-100 px-2 py-0.5">top: {item.topLabel}</span>}
-                      {item.pantsLabel && <span className="inline-block mr-2 text-xs rounded-full bg-gray-100 px-2 py-0.5">pants: {item.pantsLabel}</span>}
-                      {item.shoesLabel && <span className="inline-block mr-2 text-xs rounded-full bg-gray-100 px-2 py-0.5">shoes: {item.shoesLabel}</span>}
-                    </div>
-                  </div>
-                </div>
-                </button>
-              </li>
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onApply?.({ person: item.personImage, top: item.topImage, pants: item.pantsImage, shoes: item.shoesImage, topLabel: item.topLabel, pantsLabel: item.pantsLabel, shoesLabel: item.shoesLabel })}
+                className="aspect-[4/5] rounded-md overflow-hidden bg-gray-100 ring-1 ring-transparent hover:ring-blue-200 transition"
+                title="클릭하면 입력을 적용합니다"
+              >
+                {first ? (
+                  <img src={first} alt="input" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">-</div>
+                )}
+              </button>
             );
           })}
-        </ul>
+        </div>
       </Card>
 
       <Card className="space-y-3 lg:col-span-2">

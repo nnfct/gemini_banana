@@ -65,8 +65,10 @@ export const VirtualTryOnUI: React.FC = () => {
         const src = sourceOverride ?? personSource;
         // Skip only when the event is a person change coming from AI model
         if (src === 'model' && overrides && 'person' in overrides) return;
+        // For non-person events while using AI model, avoid labeling as 'model' to hide AI model traces
+        const recordPerson: 'model' | 'upload' | 'unknown' = (src === 'model' && !(overrides && 'person' in overrides)) ? 'unknown' : src;
         tryOnHistory.addInput({
-            person: src,
+            person: recordPerson,
             topLabel: labels?.top ?? (mode === 'delta' ? undefined : topLabel),
             pantsLabel: labels?.pants ?? (mode === 'delta' ? undefined : pantsLabel),
             shoesLabel: labels?.shoes ?? (mode === 'delta' ? undefined : shoesLabel),
@@ -97,9 +99,9 @@ export const VirtualTryOnUI: React.FC = () => {
 
             // Record input history with small previews (data URLs)
             const toDataUrl = (img: UploadedImage | null | undefined) => img ? `data:${img.mimeType};base64,${img.base64}` : undefined;
-            // Snapshot logging (include even when person is model so clothing changes are tracked)
+            // Snapshot logging: hide 'model' label to avoid AI 모델 히스토리 노출
             tryOnHistory.addInput({
-                person: personSource,
+                person: personSource === 'upload' ? 'upload' : 'unknown',
                 topLabel,
                 pantsLabel,
                 shoesLabel,
@@ -271,7 +273,7 @@ export const VirtualTryOnUI: React.FC = () => {
                                                     if (slot === 'shoes') { setShoesImage(up); setShoesLabel(item.title); recordInput({ shoes: up }, { shoes: item.title }, 'delta'); }
                                                     addToast(toast.success('피팅에 담겼습니다', `${item.title} → ${slot}`, { duration: 2000 }));
                                                     if (personImage) {
-                                                        setTimeout(() => { (async () => { await combineNow(); })(); }, 0);
+                                                        void 0; // generation only via Try It On
                                                     } else {
                                                         addToast(toast.info('모델을 먼저 선택하세요', '상반신 모델을 선택하면 자동 합성됩니다.', { duration: 1800 }));
                                                     }
@@ -360,7 +362,7 @@ export const VirtualTryOnUI: React.FC = () => {
                                             if (slot === 'shoes') { setShoesImage(up); setShoesLabel(item.title); recordInput({ shoes: up }, { shoes: item.title }, 'delta'); }
                                             addToast(toast.success(`담기 완료: ${item.title}`, undefined, { duration: 1600 }));
                                             if (personImage) {
-                                                setTimeout(() => { (async () => { await combineNow(); })(); }, 0);
+                                                void 0; // generation only via Try It On
                                             } else {
                                                 addToast(toast.info('먼저 모델을 선택해주세요', undefined, { duration: 1400 }));
                                             }
