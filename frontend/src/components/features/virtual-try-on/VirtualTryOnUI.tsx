@@ -217,7 +217,7 @@ export const VirtualTryOnUI: React.FC = () => {
                 <main className="mt-8 mx-auto w-full max-w-screen-xl xl:max-w-[1400px] 2xl:max-w-[1600px]">
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 xl:gap-10 items-start">
                         {/* Input Section */}
-                        <div className="lg:col-span-8 bg-white p-6 xl:p-7 rounded-2xl shadow-sm border border-gray-200">
+                        <div className="lg:col-span-8 order-1 bg-white p-6 xl:p-7 rounded-2xl shadow-sm border border-gray-200">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 xl:gap-7">
                                 <div className="md:col-span-1">
                                     <ModelPicker direction="vertical" onPick={(img) => { setPersonImage(img); setPersonSource('model'); recordInput({ person: img }, undefined, 'delta', 'model'); }} />
@@ -254,19 +254,8 @@ export const VirtualTryOnUI: React.FC = () => {
                                 </div>
                             </div>
                         </div>
-
-                        {/* Action and Result Section */}
-                        <div className="lg:col-span-4 flex flex-col gap-6 xl:gap-7 lg:sticky lg:top-20">
-                            <CombineButton
-                                onClick={handleCombineClick}
-                                disabled={!canCombine || isLoading}
-                                isLoading={isLoading}
-                            />
-                            <ResultDisplay
-                                generatedImage={generatedImage}
-                                isLoading={isLoading}
-                                error={error}
-                            />
+                        {/* Histories section separated from upload card */}
+                        <div className="lg:col-span-8 order-3">
                             <TryOnHistory onApply={(payload) => {
                                 const parse = (data?: string, title?: string): UploadedImage | null => {
                                     if (!data) return null;
@@ -274,7 +263,6 @@ export const VirtualTryOnUI: React.FC = () => {
                                     if (!m) return null;
                                     const mimeType = m[1];
                                     const base64 = m[2];
-                                    // Construct a File from base64 for consistency
                                     try {
                                         const byteChars = atob(base64);
                                         const byteNumbers = new Array(byteChars.length);
@@ -298,6 +286,20 @@ export const VirtualTryOnUI: React.FC = () => {
                                 if (s) { setShoesImage(s); setShoesLabel(payload.shoesLabel || '히스토리'); }
                                 addToast(toast.success('히스토리에서 적용했습니다', undefined, { duration: 1200 }));
                             }} />
+                        </div>
+
+                        {/* Action and Result Section */}
+                        <div className="lg:col-span-4 order-2 flex flex-col gap-6 xl:gap-7 lg:sticky lg:top-0 self-start">
+                            <CombineButton
+                                onClick={handleCombineClick}
+                                disabled={!canCombine || isLoading}
+                                isLoading={isLoading}
+                            />
+                            <ResultDisplay
+                                generatedImage={generatedImage}
+                                isLoading={isLoading}
+                                error={error}
+                            />
                             {/* ModelPicker moved to left sidebar in input section */}
                             {likedItems.length > 0 && (
                                 <Card className="space-y-3">

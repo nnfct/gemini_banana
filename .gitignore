@@ -140,3 +140,8 @@ __pycache__/
 *.pyd
 .Python
 *.so
+
+# Ignore additional environment files (security)
+.env.development
+.env.production
+frontend/.env.development

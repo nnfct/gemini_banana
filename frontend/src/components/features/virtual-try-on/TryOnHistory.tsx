@@ -38,8 +38,8 @@ export const TryOnHistory: React.FC<TryOnHistoryProps> = ({ onApply }) => {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-6">
-      <Card className="space-y-3 lg:col-span-1">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <Card className="space-y-3 lg:col-span-1 min-h-[260px]">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-800">입력 히스토리</h3>
           <div className="flex gap-2">
@@ -72,7 +72,7 @@ export const TryOnHistory: React.FC<TryOnHistoryProps> = ({ onApply }) => {
         </div>
       </Card>
 
-      <Card className="space-y-3 lg:col-span-2">
+      <Card className="space-y-3 lg:col-span-2 min-h-[260px]">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-800">결과 히스토리</h3>
           <div className="flex gap-2">
@@ -80,18 +80,17 @@ export const TryOnHistory: React.FC<TryOnHistoryProps> = ({ onApply }) => {
             <Button size="sm" variant="ghost" onClick={() => { tryOnHistory.clearOutputs(); refresh(); }}>비우기</Button>
           </div>
         </div>
-        <div className="overflow-x-auto whitespace-nowrap flex gap-4 pb-1">
-          {outputs.length === 0 ? (
-            <div className="text-sm text-gray-500">기록이 없습니다.</div>
-          ) : outputs.map(o => (
-            <button key={o.id} onClick={() => setView(o.image)} className="inline-block w-40 group">
-              <div className="aspect-[4/5] rounded-lg overflow-hidden bg-gray-100 ring-1 ring-transparent group-hover:ring-blue-200">
+        {outputs.length === 0 ? (
+          <div className="text-sm text-gray-500">기록이 없습니다.</div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            {outputs.map(o => (
+              <button key={o.id} onClick={() => setView(o.image)} className="group aspect-[4/5] rounded-lg overflow-hidden bg-gray-100 ring-1 ring-transparent hover:ring-blue-200">
                 <img src={o.image} alt="history" className="w-full h-full object-cover" />
-              </div>
-              <div className="mt-1 text-xs text-gray-600 text-center">{fmt(o.ts)}</div>
-            </button>
-          ))}
-        </div>
+              </button>
+            ))}
+          </div>
+        )}
       </Card>
 
       {view && <FullScreenImage src={view} onClose={() => setView(null)} />}
