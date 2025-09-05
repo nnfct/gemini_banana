@@ -63,7 +63,7 @@ export const RecommendationDisplay: React.FC<RecommendationDisplayProps> = ({
         };
 
         const body = (
-            <Card className="cursor-pointer hover:shadow-lg transition-shadow duration-200">
+            <Card className="cursor-pointer hover:shadow-lg transition-shadow duration-200" onClick={() => onItemClick?.(item)}>
                 <div className="aspect-square bg-gray-100 rounded-lg mb-3 overflow-hidden">
                     {item.imageUrl ? (
                         <img
@@ -102,21 +102,8 @@ export const RecommendationDisplay: React.FC<RecommendationDisplayProps> = ({
             </Card>
         );
 
-        const url = (item as any).productUrl as string | undefined;
-        return url ? (
-            <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block"
-            >
-                {body}
-            </a>
-        ) : (
-            <div
-                onClick={() => onItemClick?.(item)}
-                className="block"
-            >
+        return (
+            <div className="block">
                 {body}
             </div>
         );
@@ -173,4 +160,3 @@ export const RecommendationDisplay: React.FC<RecommendationDisplayProps> = ({
 };
 
 export default RecommendationDisplay;
-

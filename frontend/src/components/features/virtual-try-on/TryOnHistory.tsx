@@ -19,7 +19,13 @@ export const TryOnHistory: React.FC<TryOnHistoryProps> = ({ onApply }) => {
 
   useEffect(() => {
     const unsub = tryOnHistory.subscribe(() => refresh());
-    return () => unsub();
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'app:tryon:history:inputs:v1' || e.key === 'app:tryon:history:outputs:v1') {
+        refresh();
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => { unsub(); window.removeEventListener('storage', onStorage); };
   }, []);
 
   // Lightweight relative time
@@ -32,7 +38,7 @@ export const TryOnHistory: React.FC<TryOnHistoryProps> = ({ onApply }) => {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 gap-6">
       <Card className="space-y-3 lg:col-span-1">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-800">입력 히스토리</h3>

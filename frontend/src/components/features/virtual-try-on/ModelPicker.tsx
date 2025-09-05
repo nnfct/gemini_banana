@@ -104,10 +104,10 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({ onPick, direction = 'h
           </div>
           <span className="text-[10px] text-gray-400">public/models</span>
         </div>
-        <div className="flex flex-col gap-3 max-h-[520px] overflow-y-auto pr-1">
+        <div className="flex flex-col gap-3 max-h-[60vh] xl:max-h-[70vh] overflow-y-auto pr-1">
           {candidates.map(m => (
             <div key={m.id} className="w-full">
-              <div className="aspect-[3/4] rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
+              <div className="aspect-[3/4] rounded-lg overflow-hidden bg-gray-100 border border-gray-200 ring-1 ring-transparent hover:ring-blue-200 cursor-pointer" onClick={() => handlePick(m.urls, m.id, m.id)} title="이미지를 클릭하면 적용됩니다">
                 {previewMap[m.id] ? (
                   <img src={previewMap[m.id]} alt={m.label} className="w-full h-full object-cover" />
                 ) : (
@@ -138,7 +138,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({ onPick, direction = 'h
       <div className="overflow-x-auto whitespace-nowrap flex gap-4 pb-1">
         {candidates.map(m => (
           <div key={m.id} className="inline-block w-32">
-            <div className="aspect-[3/4] rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
+            <div className="aspect-[3/4] rounded-lg overflow-hidden bg-gray-100 border border-gray-200 ring-1 ring-transparent hover:ring-blue-200 cursor-pointer" onClick={() => handlePick(m.urls, m.id, m.id)} title="이미지를 클릭하면 적용됩니다">
               {previewMap[m.id] ? (
                 <img src={previewMap[m.id]} alt={m.label} className="w-full h-full object-cover" />
               ) : (

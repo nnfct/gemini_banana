@@ -25,7 +25,7 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({
 
     return (
         <>
-            <div className="w-full aspect-[4/3] bg-white border border-gray-200 rounded-2xl flex justify-center items-center p-4 shadow-sm relative overflow-hidden">
+            <div className="w-full aspect-[4/3] lg:aspect-[5/4] xl:aspect-[4/5] 2xl:aspect-[3/4] min-h-[280px] lg:min-h-[420px] xl:min-h-[560px] bg-white border border-gray-200 rounded-2xl flex justify-center items-center p-4 shadow-sm relative overflow-hidden">
                 {isLoading && (
                     <div className="flex flex-col items-center gap-4 text-gray-600">
                         <Spinner size="lg" />

@@ -56,13 +56,17 @@ export const VirtualTryOnUI: React.FC = () => {
         overrides?: Partial<{ person: UploadedImage | null; top: UploadedImage | null; pants: UploadedImage | null; shoes: UploadedImage | null; }>,
         labels?: Partial<{ top: string; pants: string; shoes: string }>,
         mode: 'delta' | 'snapshot' = 'delta',
+        sourceOverride?: 'model' | 'upload' | 'unknown',
     ) => {
         const p = mode === 'delta' ? (overrides?.person ?? null) : (overrides && 'person' in overrides ? overrides.person : personImage);
         const t = mode === 'delta' ? (overrides?.top ?? null) : (overrides && 'top' in overrides ? overrides.top : topImage);
         const pa = mode === 'delta' ? (overrides?.pants ?? null) : (overrides && 'pants' in overrides ? overrides.pants : pantsImage);
         const s = mode === 'delta' ? (overrides?.shoes ?? null) : (overrides && 'shoes' in overrides ? overrides.shoes : shoesImage);
+        const src = sourceOverride ?? personSource;
+        // Skip only when the event is a person change coming from AI model
+        if (src === 'model' && overrides && 'person' in overrides) return;
         tryOnHistory.addInput({
-            person: personSource,
+            person: src,
             topLabel: labels?.top ?? (mode === 'delta' ? undefined : topLabel),
             pantsLabel: labels?.pants ?? (mode === 'delta' ? undefined : pantsLabel),
             shoesLabel: labels?.shoes ?? (mode === 'delta' ? undefined : shoesLabel),
@@ -93,6 +97,7 @@ export const VirtualTryOnUI: React.FC = () => {
 
             // Record input history with small previews (data URLs)
             const toDataUrl = (img: UploadedImage | null | undefined) => img ? `data:${img.mimeType};base64,${img.base64}` : undefined;
+            // Snapshot logging (include even when person is model so clothing changes are tracked)
             tryOnHistory.addInput({
                 person: personSource,
                 topLabel,
@@ -157,20 +162,20 @@ export const VirtualTryOnUI: React.FC = () => {
         <div className="flex flex-col items-center p-4 sm:p-6 lg:p-8 bg-gray-50">
             <div className="w-full">
                 <Header />
-                <main className="mt-8 max-w-3xl mx-auto">
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                <main className="mt-8 mx-auto w-full max-w-screen-xl xl:max-w-[1400px] 2xl:max-w-[1600px]">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 xl:gap-10 items-start">
                         {/* Input Section */}
-                        <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="lg:col-span-8 bg-white p-6 xl:p-7 rounded-2xl shadow-sm border border-gray-200">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 xl:gap-7">
                                 <div className="md:col-span-1">
-                                    <ModelPicker direction="vertical" onPick={(img) => { setPersonImage(img); setPersonSource('model'); recordInput({ person: img }, undefined, 'delta'); }} />
+                                    <ModelPicker direction="vertical" onPick={(img) => { setPersonImage(img); setPersonSource('model'); recordInput({ person: img }, undefined, 'delta', 'model'); }} />
                                 </div>
-                                <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6 xl:gap-7">
                                     <ImageUploader
                                         id="person-image"
                                         title="Person"
                                         description="Upload a full-body photo."
-                                        onImageUpload={(img) => { setPersonImage(img); setPersonSource(img ? 'upload' : 'unknown'); recordInput({ person: img }, undefined, 'delta'); }}
+                                        onImageUpload={(img) => { setPersonImage(img); setPersonSource(img ? 'upload' : 'unknown'); recordInput({ person: img }, undefined, 'delta', img ? 'upload' : 'unknown'); }}
                                         externalImage={personImage}
                                     />
                                     <ImageUploader
@@ -199,7 +204,7 @@ export const VirtualTryOnUI: React.FC = () => {
                         </div>
 
                         {/* Action and Result Section */}
-                        <div className="flex flex-col gap-6">
+                        <div className="lg:col-span-4 flex flex-col gap-6 xl:gap-7 lg:sticky lg:top-20">
                             <CombineButton
                                 onClick={handleCombineClick}
                                 disabled={!canCombine || isLoading}
@@ -336,9 +341,31 @@ export const VirtualTryOnUI: React.FC = () => {
                             ) : recommendations ? (
                                 <RecommendationDisplay
                                     recommendations={recommendations}
-                                    onItemClick={(item) => {
-                                        if ((item as any).productUrl) {
-                                            window.open((item as any).productUrl as string, '_blank', 'noopener,noreferrer');
+                                    onItemClick={async (item) => {
+                                        const cat = (item.category || '').toLowerCase();
+                                        const slot: 'top' | 'pants' | 'shoes' | null =
+                                            cat.includes('top') ? 'top'
+                                            : cat.includes('pant') ? 'pants'
+                                            : cat.includes('shoe') ? 'shoes'
+                                            : (cat === '상의' ? 'top' : (cat === '하의' ? 'pants' : (cat === '신발' ? 'shoes' : null)));
+                                        if (!slot) return;
+                                        if (!item.imageUrl) {
+                                            addToast(toast.error('이미지 URL이 없어 담을 수 없어요'));
+                                            return;
+                                        }
+                                        try {
+                                            const up = await imageProxy.toUploadedImage(item.imageUrl, item.title);
+                                            if (slot === 'top') { setTopImage(up); setTopLabel(item.title); recordInput({ top: up }, { top: item.title }, 'delta'); }
+                                            if (slot === 'pants') { setPantsImage(up); setPantsLabel(item.title); recordInput({ pants: up }, { pants: item.title }, 'delta'); }
+                                            if (slot === 'shoes') { setShoesImage(up); setShoesLabel(item.title); recordInput({ shoes: up }, { shoes: item.title }, 'delta'); }
+                                            addToast(toast.success(`담기 완료: ${item.title}`, undefined, { duration: 1600 }));
+                                            if (personImage) {
+                                                setTimeout(() => { (async () => { await combineNow(); })(); }, 0);
+                                            } else {
+                                                addToast(toast.info('먼저 모델을 선택해주세요', undefined, { duration: 1400 }));
+                                            }
+                                        } catch (e: any) {
+                                            addToast(toast.error('가져오기에 실패했어요', e?.message));
                                         }
                                     }}
                                 />

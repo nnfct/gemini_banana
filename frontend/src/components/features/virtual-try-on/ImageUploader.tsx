@@ -96,7 +96,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             <h3 className="font-semibold text-gray-800">{title}</h3>
             <label
                 htmlFor={id}
-                className="relative w-full aspect-[4/3] border-2 border-dashed border-gray-300 rounded-xl flex flex-col justify-center items-center text-center p-4 cursor-pointer hover:border-primary-500 hover:bg-primary-50 transition-colors duration-200"
+                className="relative w-full aspect-[4/3] xl:aspect-[5/4] 2xl:aspect-[4/3] min-h-[220px] md:min-h-[240px] lg:min-h-[260px] xl:min-h-[300px] border-2 border-dashed border-gray-300 rounded-xl flex flex-col justify-center items-center text-center p-4 cursor-pointer hover:border-primary-500 hover:bg-primary-50 transition-colors duration-200"
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
