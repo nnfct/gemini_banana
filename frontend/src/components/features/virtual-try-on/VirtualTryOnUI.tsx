@@ -131,7 +131,7 @@ export const VirtualTryOnUI: React.FC = () => {
                 topLabel,
                 pantsLabel,
                 shoesLabel,
-                personImage: toDataUrl(personImage),
+                personImage: personSource === 'upload' ? toDataUrl(personImage) : undefined,
                 topImage: toDataUrl(topImage),
                 pantsImage: toDataUrl(pantsImage),
                 shoesImage: toDataUrl(shoesImage),

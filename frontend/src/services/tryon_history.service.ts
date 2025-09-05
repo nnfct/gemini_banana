@@ -46,6 +46,10 @@ function notify() {
 
 export const tryOnHistory = {
   addInput(item: Omit<TryOnInputHistoryItem, 'id' | 'ts'>) {
+    // Drop entries that are only AI-model person without any clothing images
+    if (item.person !== 'upload' && !item.topImage && !item.pantsImage && !item.shoesImage) {
+      return;
+    }
     const now: TryOnInputHistoryItem = { id: `h-${Date.now()}-${Math.random().toString(36).slice(2)}`, ts: Date.now(), ...item };
     const list = [now, ...read<TryOnInputHistoryItem>(KEY_INPUTS)].slice(0, LIMIT);
     write(KEY_INPUTS, list);

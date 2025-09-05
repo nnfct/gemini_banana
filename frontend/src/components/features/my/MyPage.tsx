@@ -26,7 +26,7 @@ export const MyPage: React.FC = () => {
   }, []);
 
   const inputThumb = (item: TryOnInputHistoryItem) => {
-    const first = item.personImage || item.topImage || item.pantsImage || item.shoesImage;
+    const first = item.topImage || item.pantsImage || item.shoesImage || item.personImage;
     return first || '';
   };
 
@@ -88,4 +88,3 @@ export const MyPage: React.FC = () => {
 };
 
 export default MyPage;
-

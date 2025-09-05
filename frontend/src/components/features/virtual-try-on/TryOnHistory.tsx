@@ -51,7 +51,8 @@ export const TryOnHistory: React.FC<TryOnHistoryProps> = ({ onApply }) => {
           {inputs.length === 0 ? (
             <div className="col-span-2 py-4 text-sm text-gray-500 text-center">기록이 없습니다.</div>
           ) : inputs.map(item => {
-            const first = item.personImage || item.topImage || item.pantsImage || item.shoesImage;
+            // Prefer clothing thumbnails over person to avoid showing AI model face
+            const first = item.topImage || item.pantsImage || item.shoesImage || item.personImage;
             return (
               <button
                 key={item.id}
