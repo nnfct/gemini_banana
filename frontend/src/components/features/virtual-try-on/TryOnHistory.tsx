@@ -47,7 +47,7 @@ export const TryOnHistory: React.FC<TryOnHistoryProps> = ({ onApply }) => {
             <Button size="sm" variant="ghost" onClick={() => { tryOnHistory.clearInputs(); refresh(); }}>비우기</Button>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="columns-2 gap-x-3">
           {inputs.length === 0 ? (
             <div className="col-span-2 py-4 text-sm text-gray-500 text-center">기록이 없습니다.</div>
           ) : inputs.map(item => {
@@ -58,13 +58,13 @@ export const TryOnHistory: React.FC<TryOnHistoryProps> = ({ onApply }) => {
                 key={item.id}
                 type="button"
                 onClick={() => onApply?.({ person: item.personImage, top: item.topImage, pants: item.pantsImage, shoes: item.shoesImage, topLabel: item.topLabel, pantsLabel: item.pantsLabel, shoesLabel: item.shoesLabel })}
-                className="aspect-[4/5] rounded-md overflow-hidden bg-gray-100 ring-1 ring-transparent hover:ring-blue-200 transition"
+                className="mb-3 break-inside-avoid rounded-md overflow-hidden bg-gray-100 ring-1 ring-transparent hover:ring-blue-200 transition w-full"
                 title="클릭하면 입력을 적용합니다"
               >
                 {first ? (
-                  <img src={first} alt="input" className="w-full h-full object-cover" />
+                  <img src={first} alt="input" className="block w-full h-auto object-cover" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">-</div>
+                  <div className="aspect-[4/5] w-full flex items-center justify-center text-gray-400 text-xs">-</div>
                 )}
               </button>
             );
