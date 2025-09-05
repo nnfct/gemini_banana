@@ -5,6 +5,7 @@ import { CombineButton } from './CombineButton';
 import { RecommendationDisplay } from '../recommendations/RecommendationDisplay';
 import { Header } from '../layout/Header';
 import { virtualTryOnService } from '../../../services/virtualTryOn.service';
+import { apiClient } from '../../../services/api.service';
 import type { UploadedImage, ApiFile, ClothingItems, RecommendationOptions, RecommendationItem } from '../../../types';
 import { Card, Input, Button, useToast, toast } from '../../ui';
 import { likesService } from '../../../services/likes.service';
@@ -43,6 +44,31 @@ export const VirtualTryOnUI: React.FC = () => {
     const [minPrice, setMinPrice] = useState<string>('');
     const [maxPrice, setMaxPrice] = useState<string>('');
     const [excludeTagsInput, setExcludeTagsInput] = useState<string>('');
+
+    // Random items to show before recommendations are available
+    const [randomItemsByCat, setRandomItemsByCat] = useState<{ top: RecommendationItem[]; pants: RecommendationItem[]; shoes: RecommendationItem[] }>({ top: [], pants: [], shoes: [] });
+    const [isLoadingRandom, setIsLoadingRandom] = useState<boolean>(false);
+    const fetchRandom = useCallback(async (limit: number = 12) => {
+        try {
+            setIsLoadingRandom(true);
+            const per = Math.max(1, Math.floor(limit / 3));
+            const [tops, pants, shoes] = await Promise.all([
+                apiClient.get<RecommendationItem[]>(`/api/recommend/random?limit=${per}&category=top`).catch(() => [] as RecommendationItem[]),
+                apiClient.get<RecommendationItem[]>(`/api/recommend/random?limit=${per}&category=pants`).catch(() => [] as RecommendationItem[]),
+                apiClient.get<RecommendationItem[]>(`/api/recommend/random?limit=${per}&category=shoes`).catch(() => [] as RecommendationItem[]),
+            ]);
+            setRandomItemsByCat({ top: tops, pants, shoes });
+        } catch (e) {
+            // ignore silently
+            setRandomItemsByCat({ top: [], pants: [], shoes: [] });
+        } finally {
+            setIsLoadingRandom(false);
+        }
+    }, []);
+    useEffect(() => {
+        // Fetch once on mount; keep until proper recommendations arrive
+        fetchRandom(12);
+    }, [fetchRandom]);
 
     const convertToApiFile = (uploadedImage: UploadedImage): ApiFile => ({
         base64: uploadedImage.base64,
@@ -159,6 +185,30 @@ export const VirtualTryOnUI: React.FC = () => {
     }, [handleCombineClick]);
 
     const canCombine = personImage && (topImage || pantsImage || shoesImage);
+
+    // Helper: add a catalog/recommendation item into proper slot
+    const addCatalogItemToSlot = useCallback(async (item: RecommendationItem) => {
+        const cat = (item.category || '').toLowerCase();
+        const slot: 'top' | 'pants' | 'shoes' | null =
+            cat.includes('top') ? 'top'
+            : cat.includes('pant') ? 'pants'
+            : cat.includes('shoe') ? 'shoes'
+            : (cat === '상의' ? 'top' : (cat === '하의' ? 'pants' : (cat === '신발' ? 'shoes' : null)));
+        if (!slot) return;
+        if (!item.imageUrl) {
+            addToast(toast.error('이미지 URL이 없어 담을 수 없어요'));
+            return;
+        }
+        try {
+            const up = await imageProxy.toUploadedImage(item.imageUrl, item.title);
+            if (slot === 'top') { setTopImage(up); setTopLabel(item.title); recordInput({ top: up }, { top: item.title }, 'delta'); }
+            if (slot === 'pants') { setPantsImage(up); setPantsLabel(item.title); recordInput({ pants: up }, { pants: item.title }, 'delta'); }
+            if (slot === 'shoes') { setShoesImage(up); setShoesLabel(item.title); recordInput({ shoes: up }, { shoes: item.title }, 'delta'); }
+            addToast(toast.success(`담기 완료: ${item.title}. Try It On을 눌러 합성하세요`, undefined, { duration: 1800 }));
+        } catch (e: any) {
+            addToast(toast.error('가져오기에 실패했어요', e?.message));
+        }
+    }, [addToast, setTopImage, setPantsImage, setShoesImage, setTopLabel, setPantsLabel, setShoesLabel]);
 
     return (
         <div className="flex flex-col items-center p-4 sm:p-6 lg:p-8 bg-gray-50">
@@ -372,6 +422,61 @@ export const VirtualTryOnUI: React.FC = () => {
                                     }}
                                 />
                             ) : null}
+                        </div>
+                    )}
+                    {/* Fallback random items before recommendations are available */}
+                    {!recommendations && !isLoadingRecommendations && (
+                        <div className="mt-8">
+                            <Card>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h2 className="text-2xl font-bold text-gray-800">랜덤 아이템</h2>
+                                    <Button size="sm" onClick={() => fetchRandom(12)} loading={isLoadingRandom}>새로고침</Button>
+                                </div>
+                                <div className="space-y-6">
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-gray-800 mb-2">상의</h3>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                                            {randomItemsByCat.top.map(item => (
+                                                <Card key={item.id} className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => addCatalogItemToSlot(item)} padding="sm">
+                                                    <div className="aspect-[4/5] rounded-lg overflow-hidden bg-gray-100 mb-2">
+                                                        {item.imageUrl && <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />}
+                                                    </div>
+                                                    <p className="text-xs text-gray-700 truncate" title={item.title}>{item.title}</p>
+                                                </Card>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-gray-800 mb-2">하의</h3>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                                            {randomItemsByCat.pants.map(item => (
+                                                <Card key={item.id} className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => addCatalogItemToSlot(item)} padding="sm">
+                                                    <div className="aspect-[4/5] rounded-lg overflow-hidden bg-gray-100 mb-2">
+                                                        {item.imageUrl && <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />}
+                                                    </div>
+                                                    <p className="text-xs text-gray-700 truncate" title={item.title}>{item.title}</p>
+                                                </Card>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-gray-800 mb-2">신발</h3>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                                            {randomItemsByCat.shoes.map(item => (
+                                                <Card key={item.id} className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => addCatalogItemToSlot(item)} padding="sm">
+                                                    <div className="aspect-[4/5] rounded-lg overflow-hidden bg-gray-100 mb-2">
+                                                        {item.imageUrl && <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />}
+                                                    </div>
+                                                    <p className="text-xs text-gray-700 truncate" title={item.title}>{item.title}</p>
+                                                </Card>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    {randomItemsByCat.top.length + randomItemsByCat.pants.length + randomItemsByCat.shoes.length === 0 && (
+                                        <div className="text-center text-gray-500 py-6">아이템을 불러오는 중이거나 목록이 비어있습니다.</div>
+                                    )}
+                                </div>
+                            </Card>
                         </div>
                     )}
                 </main>

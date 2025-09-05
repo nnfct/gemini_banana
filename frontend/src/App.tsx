@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { VirtualTryOnUI, ECommerceUI, BottomNav, LikesPage } from './components/features';
+import { VirtualTryOnUI, ECommerceUI, BottomNav, LikesPage, MyPage } from './components/features';
 import { TopBar } from './components/features/layout/TopBar';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { ToastProvider } from './components/ui/Toast';
@@ -16,6 +16,8 @@ function App() {
                 return <ECommerceUI onNavigate={(p) => setCurrentPage(p)} />;
             case 'likes':
                 return <LikesPage />;
+            case 'my':
+                return <MyPage />;
             default:
                 return <VirtualTryOnUI />;
         }

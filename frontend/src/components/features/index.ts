@@ -5,3 +5,4 @@ export * from './ecommerce';
 export * from './layout';
 export * from './common';
 export * from './likes';
+export * from './my';

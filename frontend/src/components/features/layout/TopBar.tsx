@@ -1,9 +1,9 @@
 import React from 'react';
 
-interface TopBarProps { onNavigate?: (page: 'home' | 'try-on' | 'likes') => void }
+interface TopBarProps { onNavigate?: (page: 'home' | 'try-on' | 'likes' | 'my') => void }
 
 export const TopBar: React.FC<TopBarProps> = ({ onNavigate }) => {
-  const items: Array<{ id: string; label: string; go?: 'home' | 'try-on' | 'likes' }>= [
+  const items: Array<{ id: string; label: string; go?: 'home' | 'try-on' | 'likes' | 'my' }>= [
     { id: 'home', label: 'HOME', go: 'home' },
     { id: 'style', label: 'STYLE' },
     { id: 'shop', label: 'SHOP' },
@@ -27,4 +27,3 @@ export const TopBar: React.FC<TopBarProps> = ({ onNavigate }) => {
 };
 
 export default TopBar;
-

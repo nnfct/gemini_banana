@@ -16,7 +16,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activePage, setPage }) => 
         { id: 'try-on', label: '사이버피팅', icon: ShirtIcon, page: 'try-on' },
         { id: 'home', label: '무신사 홈', icon: HomeIcon, page: 'home' },
         { id: 'likes', label: '좋아요', icon: HeartIcon, page: 'likes' },
-        { id: 'my', label: '마이', icon: UserIcon, page: null },
+        { id: 'my', label: '마이', icon: UserIcon, page: 'my' },
     ];
 
     return (
@@ -41,4 +41,3 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activePage, setPage }) => 
         </footer>
     );
 };
-
